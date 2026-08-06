@@ -19,7 +19,6 @@ public interface RepoService {
 
 	/**
 	 * 获取单个模板库
-	 * 
 	 * @param id
 	 * @return
 	 */
@@ -27,42 +26,36 @@ public interface RepoService {
 
 	/**
 	 * 添加题库
-	 * 
 	 * @param request 题库
 	 */
 	void addRepo(RepoRequest request);
 
 	/**
 	 * 更新题库
-	 * 
 	 * @param request 题库
 	 */
 	void updateRepo(RepoRequest request);
 
 	/**
 	 * 删除题库
-	 * 
 	 * @param request 题库
 	 */
 	void deleteRepo(RepoRequest request);
 
 	/**
 	 * 批量添加题库模板
-	 * 
 	 * @param request
 	 */
 	void batchAddRepoTemplate(RepoTemplateRequest request);
 
 	/**
 	 * 解除题库与模板的绑定关系
-	 * 
 	 * @param request
 	 */
 	void batchUnBindTemplate(RepoTemplateRequest request);
 
 	/**
 	 * 从题库里面挑选试题
-	 * 
 	 * @param repos
 	 * @return
 	 */
@@ -82,8 +75,8 @@ public interface RepoService {
 
 	/**
 	 * 导出题库题目
-	 * 
 	 * @param request
 	 */
 	void exportRepoQuestions(RepoRequest request);
+
 }

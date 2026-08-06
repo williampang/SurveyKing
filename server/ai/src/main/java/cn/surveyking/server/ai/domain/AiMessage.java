@@ -13,18 +13,20 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AiMessage {
-    /**
-     * 会话ID
-     */
-    private String conversationId;
-    
-    /**
-     * 消息角色
-     */
-    private String role;
-    
-    /**
-     * 消息内容
-     */
-    private String content;
+
+	/**
+	 * 会话ID
+	 */
+	private String conversationId;
+
+	/**
+	 * 消息角色
+	 */
+	private String role;
+
+	/**
+	 * 消息内容
+	 */
+	private String content;
+
 }

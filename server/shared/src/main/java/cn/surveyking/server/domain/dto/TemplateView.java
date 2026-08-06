@@ -45,5 +45,4 @@ public class TemplateView {
 
 	private String note;
 
-
 }

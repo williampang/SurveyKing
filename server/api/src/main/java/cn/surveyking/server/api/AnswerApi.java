@@ -1,6 +1,7 @@
 package cn.surveyking.server.api;
 
 import cn.surveyking.server.core.common.PaginationResponse;
+import cn.surveyking.server.core.annotation.EnableDataPerm;
 import cn.surveyking.server.domain.dto.*;
 import cn.surveyking.server.service.AnswerService;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class AnswerApi {
 	 * @return 当前答案。
 	 */
 	@PreAuthorize("hasAuthority('answer:list')")
+	@EnableDataPerm(key = "#query.projectId")
 	@GetMapping("/list")
 	public PaginationResponse<AnswerView> listAnswer(AnswerQuery query) {
 		return answerService.listAnswer(query);
@@ -43,6 +45,7 @@ public class AnswerApi {
 	 * @return
 	 */
 	@PreAuthorize("hasAuthority('answer:list')")
+	@EnableDataPerm(key = "#query.projectId")
 	@GetMapping("/trash")
 	public List<AnswerView> listAnswerDeleted(AnswerQuery query) {
 		return answerService.listAnswerDeleted(query);
@@ -56,7 +59,7 @@ public class AnswerApi {
 	@GetMapping
 	@PreAuthorize("hasAuthority('answer:detail')")
 	public AnswerView getAnswer(AnswerQuery query) {
-		return answerService.getAnswer(query);
+		return answerService.getAnswerWithPermission(query);
 	}
 
 	/**
@@ -66,6 +69,7 @@ public class AnswerApi {
 	 */
 	@PostMapping("/create")
 	@PreAuthorize("hasAuthority('answer:create')")
+	@EnableDataPerm(key = "#request.projectId")
 	public void saveAnswer(@RequestBody AnswerRequest request) {
 		answerService.saveAnswer(request);
 	}
@@ -77,7 +81,7 @@ public class AnswerApi {
 	@PostMapping("/update")
 	@PreAuthorize("hasAuthority('answer:update')")
 	public void updateAnswer(@RequestBody AnswerRequest request) {
-		answerService.updateAnswer(request);
+		answerService.updateAnswerWithPermission(request);
 	}
 
 	/**
@@ -117,6 +121,7 @@ public class AnswerApi {
 	 */
 	@GetMapping("/download")
 	@PreAuthorize("hasAuthority('answer:export')")
+	@EnableDataPerm(key = "#query.projectId")
 	public ResponseEntity<Resource> download(DownloadQuery query) {
 		Locale previous = LocaleContextHolder.getLocale();
 		setLocale(query.getLocale());

@@ -24,6 +24,8 @@ public interface FileService {
 
 	ResponseEntity<Resource> loadFile(FileQuery query);
 
+	ResponseEntity<Resource> loadUserFile(FileQuery query);
+
 	void deleteFile(String id);
 
 	/**

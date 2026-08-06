@@ -386,8 +386,7 @@ public class SurveySchema implements Serializable {
 		/**
 		 * 不限、数字、日期、日期时间、时间、邮箱、手机号、身份证号、下拉单选、下拉字典、中文、字母、密码
 		 */
-		text, number, date, dateTime, time, email, mobile, idCard, select, selectDict, chinese, alphabet, horzBlank,
-		password
+		text, number, date, dateTime, time, email, mobile, idCard, select, selectDict, chinese, alphabet, horzBlank, password
 
 	}
 

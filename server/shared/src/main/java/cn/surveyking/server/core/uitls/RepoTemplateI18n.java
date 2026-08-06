@@ -99,8 +99,8 @@ public final class RepoTemplateI18n {
 		private static final List<String> OPTION_SUFFIXES = Arrays.asList("A", "B", "C", "D", "E", "F", "G", "H");
 
 		private static final Set<String> ALL_LABELS = OPTION_SUFFIXES.stream()
-			.flatMap(suffix -> getAliases("repo.template.header.option", "选项{0}", new Object[] { suffix }).stream())
-			.collect(Collectors.toCollection(LinkedHashSet::new));
+				.flatMap(suffix -> getAliases("repo.template.header.option", "选项{0}", new Object[] { suffix }).stream())
+				.collect(Collectors.toCollection(LinkedHashSet::new));
 
 	}
 
@@ -109,18 +109,16 @@ public final class RepoTemplateI18n {
 		private static final List<String> BLANK_INDEXES = Arrays.asList("1", "2", "3", "4", "5", "6", "7", "8");
 
 		private static final Set<String> ALL_LABELS = BLANK_INDEXES.stream()
-			.flatMap(index -> getAliases("repo.template.header.blank", "空{0}", new Object[] { index }).stream())
-			.collect(Collectors.toCollection(LinkedHashSet::new));
+				.flatMap(index -> getAliases("repo.template.header.blank", "空{0}", new Object[] { index }).stream())
+				.collect(Collectors.toCollection(LinkedHashSet::new));
 
 	}
 
 	public enum SheetType {
 
-		SINGLE_CHOICE("repo.template.sheet.singleChoice", "单选题"),
-		MULTIPLE_CHOICE("repo.template.sheet.multipleChoice", "多选题"),
-		TRUE_FALSE("repo.template.sheet.trueFalse", "判断题"),
-		FILL_BLANK("repo.template.sheet.fillBlank", "填空题"),
-		TEXTAREA("repo.template.sheet.textarea", "简答题");
+		SINGLE_CHOICE("repo.template.sheet.singleChoice", "单选题"), MULTIPLE_CHOICE("repo.template.sheet.multipleChoice",
+				"多选题"), TRUE_FALSE("repo.template.sheet.trueFalse", "判断题"), FILL_BLANK("repo.template.sheet.fillBlank",
+						"填空题"), TEXTAREA("repo.template.sheet.textarea", "简答题");
 
 		private final String key;
 
@@ -150,13 +148,17 @@ public final class RepoTemplateI18n {
 
 	public enum HeaderLabel {
 
-		SERIAL_NO("repo.template.header.serialNo", "序号", (map, index) -> map.put("serialNo", index)),
-		TITLE("repo.template.header.title", "题干", (map, index) -> map.put("title", index)),
-		ANALYSIS("repo.template.header.analysis", "解析", (map, index) -> map.put("examAnalysis", index)),
-		SCORE("repo.template.header.score", "分数", (map, index) -> map.put("examScore", index)),
-		SINGLE_BLANK_SCORE("repo.template.header.singleBlankScore", "单空分数", (map, index) -> map.put("examScore", index)),
-		ANSWER("repo.template.header.answer", "答案", (map, index) -> map.put("examCorrectAnswer", index)),
-		TAGS("repo.template.header.tags", "标签", (map, index) -> map.put("tags", index));
+		SERIAL_NO("repo.template.header.serialNo", "序号", (map, index) -> map.put("serialNo", index)), TITLE(
+				"repo.template.header.title", "题干",
+				(map, index) -> map.put("title", index)), ANALYSIS("repo.template.header.analysis", "解析",
+						(map, index) -> map.put("examAnalysis", index)), SCORE("repo.template.header.score", "分数",
+								(map, index) -> map.put("examScore", index)), SINGLE_BLANK_SCORE(
+										"repo.template.header.singleBlankScore", "单空分数",
+										(map, index) -> map.put("examScore", index)), ANSWER(
+												"repo.template.header.answer", "答案",
+												(map, index) -> map.put("examCorrectAnswer", index)), TAGS(
+														"repo.template.header.tags", "标签",
+														(map, index) -> map.put("tags", index));
 
 		private final String key;
 

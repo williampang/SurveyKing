@@ -30,6 +30,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -55,190 +56,245 @@ import static org.apache.commons.lang3.StringUtils.isEmpty;
 @Slf4j
 public class FileServiceImpl extends ServiceImpl<FileMapper, File> implements FileService {
 
-    private final StorageService storageService;
+	private static final Set<String> SAFE_INLINE_EXTENSIONS = Collections
+			.unmodifiableSet(new HashSet<>(Arrays.asList("jpg", "jpeg", "png", "gif", "bmp", "wbmp", "webp", "pdf",
+					"txt", "csv", "mp3", "wav", "aac", "ogg", "mp4", "webm")));
 
-    private final FileViewMapper fileViewMapper;
+	private final StorageService storageService;
 
-    private final StorageProperties storageProperties;
+	private final FileViewMapper fileViewMapper;
 
-    private final AtomicLong seq = new AtomicLong(System.currentTimeMillis());
+	private final StorageProperties storageProperties;
 
-    @Autowired
-    @Lazy
-    private ProjectService projectService;
+	private final AtomicLong seq = new AtomicLong(System.currentTimeMillis());
 
-    @Autowired
-    @Lazy
-    private SurveyService surveyService;
+	@Autowired
+	@Lazy
+	private ProjectService projectService;
 
-    @Override
-    public void deleteFile(String id) {
-        removeById(id);
-    }
+	@Autowired
+	@Lazy
+	private SurveyService surveyService;
 
-    @Override
-    @SneakyThrows(IOException.class)
-    public FileView upload(UploadFileRequest request) {
-        MultipartFile uploadFile = request.getFile();
-        String filePath = getFileNameByStrategy(Objects.requireNonNull(uploadFile.getOriginalFilename()));
-        String extName = StringUtils.substringAfterLast(uploadFile.getOriginalFilename(), ".");
-        // 通过问卷页面上传需要校验文件类型
-        if (Boolean.TRUE.equals(request.getPublicUpload())) {
-            if (StringUtils.isEmpty(request.getProjectId()) || StringUtils.isEmpty(request.getQuestionId())) {
-                throw new ErrorCodeException(FileUploadError);
-            }
-            ProjectView projectView = projectService.getProject(request.getProjectId());
-            // 校验对应项目状态
-            surveyService.validateProject(projectView);
+	@Override
+	public void deleteFile(String id) {
+		File file = getById(id);
+		if (file == null) {
+			return;
+		}
+		assertCurrentUserOwnsFile(file);
+		removeById(id);
+	}
 
-            //  校验文件拓展名
-            SurveySchema uploadSchema = SchemaHelper.flatSurveySchema(projectView.getSurvey()).stream()
-                    .filter(x -> x.getId().equals(request.getQuestionId())).findFirst()
-                    .orElseThrow(() -> new ErrorCodeException(FileUploadError));
-            String fileAccept = uploadSchema.getChildren().get(0).getAttribute().getFileAccept();
-            if (StringUtils.isNotEmpty(fileAccept)) {
-                // 只允许上传指定格式的文件
-                boolean notAllowExtension = Arrays.stream(fileAccept.split(","))
-                        .map(type -> type.trim().replaceFirst("\\.", "")).noneMatch(type -> type.equalsIgnoreCase(extName));
-                if (notAllowExtension) {
-                    throw new ErrorCodeException(FileUploadError);
-                }
-            } else {
-                // 默认文件类型白名单限制
-                boolean notAllowExtension = Arrays.stream(FileUtils.ALLOWED_EXTENSIONS)
-                        .noneMatch(ext -> ext.equalsIgnoreCase(extName));
-                if (notAllowExtension) {
-                    throw new ErrorCodeException(FileUploadError);
-                }
-            }
-        }
+	@Override
+	@SneakyThrows(IOException.class)
+	public FileView upload(UploadFileRequest request) {
+		MultipartFile uploadFile = request.getFile();
+		String filePath = getFileNameByStrategy(Objects.requireNonNull(uploadFile.getOriginalFilename()));
+		String extName = StringUtils.substringAfterLast(uploadFile.getOriginalFilename(), ".");
+		// 通过问卷页面上传需要校验文件类型
+		if (Boolean.TRUE.equals(request.getPublicUpload())) {
+			if (StringUtils.isEmpty(request.getProjectId()) || StringUtils.isEmpty(request.getQuestionId())) {
+				throw new ErrorCodeException(FileUploadError);
+			}
+			ProjectView projectView = projectService.getProject(request.getProjectId());
+			// 校验对应项目状态
+			surveyService.validateProject(projectView);
 
-        File file = new File();
-        file.setId(NanoIdUtils.randomNanoId());
-        file.setStorageType(request.getFileType());
-        file.setOriginalName(uploadFile.getOriginalFilename());
-        file.setFileName(filePath);
-        filePath = getFilePathByStrategy(request, filePath);
-        file.setFilePath(filePath);
+			// 校验文件拓展名
+			SurveySchema uploadSchema = SchemaHelper.flatSurveySchema(projectView.getSurvey()).stream()
+					.filter(x -> x.getId().equals(request.getQuestionId())).findFirst()
+					.orElseThrow(() -> new ErrorCodeException(FileUploadError));
+			String fileAccept = uploadSchema.getChildren().get(0).getAttribute().getFileAccept();
+			if (StringUtils.isNotEmpty(fileAccept)) {
+				// 只允许上传指定格式的文件
+				boolean notAllowExtension = Arrays.stream(fileAccept.split(","))
+						.map(type -> type.trim().replaceFirst("\\.", ""))
+						.noneMatch(type -> type.equalsIgnoreCase(extName));
+				if (notAllowExtension) {
+					throw new ErrorCodeException(FileUploadError);
+				}
+			}
+			else {
+				// 默认文件类型白名单限制
+				boolean notAllowExtension = Arrays.stream(FileUtils.ALLOWED_EXTENSIONS)
+						.noneMatch(ext -> ext.equalsIgnoreCase(extName));
+				if (notAllowExtension) {
+					throw new ErrorCodeException(FileUploadError);
+				}
+			}
+		}
 
-        if (isSupportImage(uploadFile.getOriginalFilename())) {
-            String thumbImagePath = storageService.getThumbImageFilePath(filePath);
-            try (InputStream inputStream = uploadFile.getInputStream()) {
-                storageService.uploadFile(storageService.generateThumbImage(inputStream), thumbImagePath);
-                file.setThumbFilePath(thumbImagePath);
-            }
-        }
-        storageService.uploadFile(uploadFile.getInputStream(), filePath);
+		File file = new File();
+		file.setId(NanoIdUtils.randomNanoId());
+		file.setStorageType(request.getFileType());
+		file.setOriginalName(uploadFile.getOriginalFilename());
+		file.setFileName(filePath);
+		filePath = getFilePathByStrategy(request, filePath);
+		file.setFilePath(filePath);
 
-        save(file);
-        FileView fileView = fileViewMapper.toView(file);
+		if (isSupportImage(uploadFile.getOriginalFilename())) {
+			String thumbImagePath = storageService.getThumbImageFilePath(filePath);
+			try (InputStream inputStream = uploadFile.getInputStream()) {
+				storageService.uploadFile(storageService.generateThumbImage(inputStream), thumbImagePath);
+				file.setThumbFilePath(thumbImagePath);
+			}
+		}
+		storageService.uploadFile(uploadFile.getInputStream(), filePath);
 
-        if (AppConsts.FileType.BARCODE == request.getFileType()) {
-            fileView.setContent(BarcodeReader.readBarcode(uploadFile.getInputStream()));
-        }
-        return fileView;
-    }
+		save(file);
+		FileView fileView = fileViewMapper.toView(file);
 
-    /**
-     * 根据存储配置，按照指定规则生成相应的文件名
-     *
-     * @param originalName 原文件名
-     * @return 文件名
-     */
-    private String getFileNameByStrategy(String originalName) {
-        String strategy = storageProperties.getLocal().getNameStrategy();
-        int idx = originalName.lastIndexOf('.');
-        String fileType = originalName.substring(idx);
-        if (LocalStorageNameStrategyEnum.SEQ_ADN_ORIGINAL_NAME.getStrategy().equals(strategy)) {
-            return seq.incrementAndGet() + "_" + originalName;
-        } else if (LocalStorageNameStrategyEnum.ORIGINAL_NAME_AND_SEQ.getStrategy().equals(strategy)) {
-            return originalName.substring(0, idx) + "_" + seq.incrementAndGet() + fileType;
-        } else if (LocalStorageNameStrategyEnum.SEQ.getStrategy().equals(strategy)) {
-            return seq.incrementAndGet() + fileType;
-        } else {
-            return UUID.randomUUID().toString().replace("-", "") + fileType;
-        }
-    }
+		if (AppConsts.FileType.BARCODE == request.getFileType()) {
+			fileView.setContent(BarcodeReader.readBarcode(uploadFile.getInputStream()));
+		}
+		return fileView;
+	}
 
-    /**
-     * 根据本地存储配置，生成不同方式的文件保存路径
-     *
-     * @param request  文件上传请求
-     * @param fileName 文件名
-     * @return 文件保存路径
-     */
-    private String getFilePathByStrategy(UploadFileRequest request, String fileName) {
-        String strategy = storageProperties.getLocal().getPathStrategy();
-        if (LocalStoragePathStrategyEnum.BY_ID.getStrategy().equals(strategy) && request.getBasePath() != null) {
-            return request.getBasePath() + java.io.File.separator + fileName;
-        } else if (LocalStoragePathStrategyEnum.BY_DATE.getStrategy().equals(strategy)) {
-            String dateFormat = storageProperties.getLocal().getDateFormat();
-            DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern(dateFormat);
-            LocalDate now = LocalDate.now();
-            dateFormat = now.format(dateTimeFormatter).replace("/", java.io.File.separator).replace("\\",
-                    java.io.File.separator);
-            return dateFormat + java.io.File.separator + fileName;
-        } else {
-            return fileName;
-        }
-    }
+	/**
+	 * 根据存储配置，按照指定规则生成相应的文件名
+	 * @param originalName 原文件名
+	 * @return 文件名
+	 */
+	private String getFileNameByStrategy(String originalName) {
+		String strategy = storageProperties.getLocal().getNameStrategy();
+		int idx = originalName.lastIndexOf('.');
+		String fileType = originalName.substring(idx);
+		if (LocalStorageNameStrategyEnum.SEQ_ADN_ORIGINAL_NAME.getStrategy().equals(strategy)) {
+			return seq.incrementAndGet() + "_" + originalName;
+		}
+		else if (LocalStorageNameStrategyEnum.ORIGINAL_NAME_AND_SEQ.getStrategy().equals(strategy)) {
+			return originalName.substring(0, idx) + "_" + seq.incrementAndGet() + fileType;
+		}
+		else if (LocalStorageNameStrategyEnum.SEQ.getStrategy().equals(strategy)) {
+			return seq.incrementAndGet() + fileType;
+		}
+		else {
+			return UUID.randomUUID().toString().replace("-", "") + fileType;
+		}
+	}
 
-    @Override
-    public List<FileView> listFiles(FileQuery query) {
-        return fileViewMapper.toView(
-                list(Wrappers.<File>lambdaQuery().eq(query.getType() != null, File::getStorageType, query.getType())
-                        // 默认只能查询自己的
-                        .eq(CollectionUtils.isEmpty(query.getIds()), File::getCreateBy,
-                                SecurityContextUtils.getUserId())
-                        // 可以根据 ids 查询已知文件
-                        .in(!CollectionUtils.isEmpty(query.getIds()), File::getId, query.getIds())));
-    }
+	/**
+	 * 根据本地存储配置，生成不同方式的文件保存路径
+	 * @param request 文件上传请求
+	 * @param fileName 文件名
+	 * @return 文件保存路径
+	 */
+	private String getFilePathByStrategy(UploadFileRequest request, String fileName) {
+		String strategy = storageProperties.getLocal().getPathStrategy();
+		if (LocalStoragePathStrategyEnum.BY_ID.getStrategy().equals(strategy) && request.getBasePath() != null) {
+			return request.getBasePath() + java.io.File.separator + fileName;
+		}
+		else if (LocalStoragePathStrategyEnum.BY_DATE.getStrategy().equals(strategy)) {
+			String dateFormat = storageProperties.getLocal().getDateFormat();
+			DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern(dateFormat);
+			LocalDate now = LocalDate.now();
+			dateFormat = now.format(dateTimeFormatter).replace("/", java.io.File.separator).replace("\\",
+					java.io.File.separator);
+			return dateFormat + java.io.File.separator + fileName;
+		}
+		else {
+			return fileName;
+		}
+	}
 
-    @Override
-    @SneakyThrows
-    public ResponseEntity<Resource> loadFile(FileQuery query) {
-        String fileId = query.getId();
-        if (fileId.contains("@")) {
-            fileId = fileId.substring(0, fileId.lastIndexOf("@"));
-        }
-        File file = getById(fileId);
-        if (file == null) {
-            log.error("未找到对应的文件 {}", fileId);
-            throw new ErrorCodeException(ErrorCode.FileNotExists);
-        }
-        Optional<MediaType> mediaType = MediaTypeFactory.getMediaType(file.getOriginalName());
-        // FIXME: 在线预览 mp4 文件会报错，但不影响使用
-        return ResponseEntity.ok().contentType(mediaType.orElse(MediaType.APPLICATION_OCTET_STREAM))
-                .headers(query.getHeaders())
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        query.getDispositionType() == AppConsts.DispositionTypeEnum.inline
-                                ? AppConsts.DispositionTypeEnum.inline.name()
-                                : HTTPUtils.getContentDispositionValue(file.getOriginalName()))
-                .body(new ByteArrayResource(storageService
-                        .download(query.getId().contains("@") ? file.getThumbFilePath() : file.getFilePath())));
-    }
+	@Override
+	public List<FileView> listFiles(FileQuery query) {
+		return fileViewMapper.toView(
+				list(Wrappers.<File>lambdaQuery().eq(query.getType() != null, File::getStorageType, query.getType())
+						// 默认只能查询自己的
+						.eq(CollectionUtils.isEmpty(query.getIds()), File::getCreateBy,
+								SecurityContextUtils.getUserId())
+						// 可以根据 ids 查询已知文件
+						.in(!CollectionUtils.isEmpty(query.getIds()), File::getId, query.getIds())));
+	}
 
-    @Override
-    public ResponseEntity<Resource> downloadTemplate(String name) {
-        String templateName = name + ".xlsx";
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, HTTPUtils.getContentDispositionValue(templateName))
-                .contentType(MediaType.parseMediaType("application/vnd.ms-excel"))
-                .body(new ClassPathResource("template/" + templateName));
-    }
+	@Override
+	@SneakyThrows
+	public ResponseEntity<Resource> loadFile(FileQuery query) {
+		File file = getFileByQuery(query);
+		return buildFileResponse(query, file);
+	}
 
-    /**
-     * 生成带文件后缀的id，由于配置了 STATIC_RESOURCES ，会导致单jar部署请求 /preview/xxx.xlsx 的时候报 404
-     *
-     * @param originalName
-     * @return
-     */
-    private String getFileId(String originalName) {
-        String suffix = StringUtils.substringAfterLast(originalName, ".");
-        if (isEmpty(suffix)) {
-            return NanoIdUtils.randomNanoId();
-        }
-        return NanoIdUtils.randomNanoId() + "." + suffix;
-    }
+	@Override
+	@SneakyThrows
+	public ResponseEntity<Resource> loadUserFile(FileQuery query) {
+		File file = getFileByQuery(query);
+		assertReadableFile(file);
+		return buildFileResponse(query, file);
+	}
+
+	private File getFileByQuery(FileQuery query) {
+		String fileId = query.getId();
+		if (fileId.contains("@")) {
+			fileId = fileId.substring(0, fileId.lastIndexOf("@"));
+		}
+		File file = getById(fileId);
+		if (file == null) {
+			log.error("未找到对应的文件 {}", fileId);
+			throw new ErrorCodeException(ErrorCode.FileNotExists);
+		}
+		return file;
+	}
+
+	private void assertCurrentUserOwnsFile(File file) {
+		if (Objects.equals(file.getCreateBy(), SecurityContextUtils.getUserId())) {
+			return;
+		}
+		throw new AccessDeniedException("无权限删除该文件");
+	}
+
+	private void assertReadableFile(File file) {
+		if (Objects.equals(file.getCreateBy(), SecurityContextUtils.getUserId())
+				|| Objects.equals(file.getShared(), 1)) {
+			return;
+		}
+		throw new AccessDeniedException("无权限访问该文件");
+	}
+
+	private ResponseEntity<Resource> buildFileResponse(FileQuery query, File file) {
+		Optional<MediaType> mediaType = MediaTypeFactory.getMediaType(file.getOriginalName());
+		HttpHeaders headers = new HttpHeaders();
+		if (query.getHeaders() != null) {
+			headers.putAll(query.getHeaders());
+		}
+		headers.add("X-Content-Type-Options", "nosniff");
+		boolean safeInline = query.getDispositionType() == AppConsts.DispositionTypeEnum.inline && isSafeInline(file);
+		MediaType responseMediaType = safeInline ? mediaType.orElse(MediaType.APPLICATION_OCTET_STREAM)
+				: MediaType.APPLICATION_OCTET_STREAM;
+		String contentDisposition = safeInline ? AppConsts.DispositionTypeEnum.inline.name()
+				: HTTPUtils.getContentDispositionValue(file.getOriginalName());
+		// FIXME: 在线预览 mp4 文件会报错，但不影响使用
+		return ResponseEntity.ok().contentType(responseMediaType).headers(headers)
+				.header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition).body(new ByteArrayResource(storageService
+						.download(query.getId().contains("@") ? file.getThumbFilePath() : file.getFilePath())));
+	}
+
+	private boolean isSafeInline(File file) {
+		String extName = StringUtils.substringAfterLast(file.getOriginalName(), ".");
+		return StringUtils.isNotBlank(extName) && SAFE_INLINE_EXTENSIONS.contains(extName.toLowerCase(Locale.ROOT));
+	}
+
+	@Override
+	public ResponseEntity<Resource> downloadTemplate(String name) {
+		String templateName = name + ".xlsx";
+		return ResponseEntity.ok()
+				.header(HttpHeaders.CONTENT_DISPOSITION, HTTPUtils.getContentDispositionValue(templateName))
+				.contentType(MediaType.parseMediaType("application/vnd.ms-excel"))
+				.body(new ClassPathResource("template/" + templateName));
+	}
+
+	/**
+	 * 生成带文件后缀的id，由于配置了 STATIC_RESOURCES ，会导致单jar部署请求 /preview/xxx.xlsx 的时候报 404
+	 * @param originalName
+	 * @return
+	 */
+	private String getFileId(String originalName) {
+		String suffix = StringUtils.substringAfterLast(originalName, ".");
+		if (isEmpty(suffix)) {
+			return NanoIdUtils.randomNanoId();
+		}
+		return NanoIdUtils.randomNanoId() + "." + suffix;
+	}
 
 }

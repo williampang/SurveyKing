@@ -8,6 +8,7 @@ pluginManagement {
 
 rootProject.name = 'survey-server'
 include 'api'
+include 'ai'
 include 'shared'
 include 'rdbms'
 include 'flow'

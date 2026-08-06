@@ -10,18 +10,20 @@ import java.util.Map;
  */
 @Data
 public class ConversationResponse {
-    /**
-     * 会话ID
-     */
-    private String id;
-    
-    /**
-     * 创建时间
-     */
-    private Long createdAt;
-    
-    /**
-     * 元数据
-     */
-    private Map<String, String> metaData;
+
+	/**
+	 * 会话ID
+	 */
+	private String id;
+
+	/**
+	 * 创建时间
+	 */
+	private Long createdAt;
+
+	/**
+	 * 元数据
+	 */
+	private Map<String, String> metaData;
+
 }

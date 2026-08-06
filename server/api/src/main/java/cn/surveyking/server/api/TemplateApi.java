@@ -29,10 +29,10 @@ public class TemplateApi {
 	}
 
 	@GetMapping("/get")
+	@PreAuthorize("hasAuthority('template:list')")
 	public TemplateView getTemplate(TemplateQuery query) {
 		return templateService.getTemplate(query);
 	}
-
 
 	@PostMapping("/create")
 	@PreAuthorize("hasAuthority('template:create')")
@@ -58,6 +58,7 @@ public class TemplateApi {
 	 * @return
 	 */
 	@GetMapping("/listCategory")
+	@PreAuthorize("hasAuthority('template:list')")
 	public Set<String> listTemplateCategories(CategoryQuery query) {
 		return templateService.listTemplateCategories(query);
 	}
@@ -68,6 +69,7 @@ public class TemplateApi {
 	 * @return
 	 */
 	@GetMapping("/listTag")
+	@PreAuthorize("hasAuthority('template:list')")
 	public Set<String> getTags(TagQuery query) {
 		return templateService.getTags(query);
 	}

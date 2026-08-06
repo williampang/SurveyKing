@@ -7,6 +7,7 @@ import cn.surveyking.server.service.FileService;
 import lombok.AllArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,8 +29,9 @@ public class FileApi {
 	 * @return
 	 */
 	@GetMapping
+	@PreAuthorize("hasAuthority('file:detail')")
 	public ResponseEntity<Resource> getFile(FileQuery query) {
-		return fileService.loadFile(query);
+		return fileService.loadUserFile(query);
 	}
 
 	/**
@@ -38,6 +40,7 @@ public class FileApi {
 	 * @return
 	 */
 	@GetMapping("/list")
+	@PreAuthorize("hasAuthority('file:list')")
 	public List<FileView> listFiles(FileQuery query) {
 		return fileService.listFiles(query);
 	}
@@ -48,6 +51,7 @@ public class FileApi {
 	 * @return
 	 */
 	@PostMapping("/create")
+	@PreAuthorize("hasAuthority('file:import')")
 	public FileView upload(UploadFileRequest request) {
 		return fileService.upload(request);
 	}
@@ -57,6 +61,7 @@ public class FileApi {
 	 * @param request
 	 */
 	@PostMapping("/delete")
+	@PreAuthorize("hasAuthority('file:delete')")
 	public void deleteImage(@RequestBody UploadFileRequest request) {
 		fileService.deleteFile(request.getId());
 	}
@@ -67,6 +72,7 @@ public class FileApi {
 	 * @return
 	 */
 	@GetMapping("/downloadTemplate")
+	@PreAuthorize("hasAuthority('file:import')")
 	public ResponseEntity<Resource> downloadTemplate(String name) {
 		return fileService.downloadTemplate(name);
 	}

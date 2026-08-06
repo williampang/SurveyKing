@@ -6,18 +6,20 @@ package cn.surveyking.server.ai.domain;
  * @author zzr
  */
 public enum EventTypeEnum {
-    /**
-     * 进行中
-     */
-    in_progress,
-    
-    /**
-     * 完成
-     */
-    done,
-    
-    /**
-     * 错误
-     */
-    error
+
+	/**
+	 * 进行中
+	 */
+	in_progress,
+
+	/**
+	 * 完成
+	 */
+	done,
+
+	/**
+	 * 错误
+	 */
+	error
+
 }

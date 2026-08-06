@@ -32,16 +32,25 @@ public class SchemaHelper {
 
 	// 常量定义
 	public static final String OPENID_COLUMN_NAME = "自定义字段";
+
 	public static final String DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
+
 	public static final String HTML_TAG_REGEX = "(<.*?>)|(&.*?;)";
+
 	public static final String MULTIPLE_SPACES_REGEX = "\\s{2,}";
+
 	public static final String DICT_SEPARATOR = "\\|";
+
 	public static final int DICT_LABEL_INDEX = 1;
 
 	private static final String[] FORMULA_INJECTION_PREFIXES = { "=", "+", "-", "@" };
+
 	private static final long MILLISECONDS_PER_SECOND = 1000L;
+
 	private static final long MILLISECONDS_PER_MINUTE = 60000L;
+
 	private static final long MILLISECONDS_PER_HOUR = 3600000L;
+
 	private static final long MILLISECONDS_PER_DAY = MILLISECONDS_PER_HOUR * 24;
 
 	private static final MessageSource MESSAGE_SOURCE = initMessageSource();
@@ -71,9 +80,8 @@ public class SchemaHelper {
 
 	/**
 	 * 将 schema 解析为导出的 excel的header
-	 * 
 	 * @param schemaDataTypes 问题数据类型列表
-	 * @param mode            项目模式
+	 * @param mode 项目模式
 	 * @return Excel表头列表
 	 */
 	public static List<String> parseColumns(List<SurveySchema> schemaDataTypes, ProjectModeEnum mode) {
@@ -89,17 +97,11 @@ public class SchemaHelper {
 		}
 
 		// 添加固定的元数据列
-		result.addAll(Arrays.asList(
-				getOpenIdColumnName(),
-				i18n("schema.column.submitter", "提交人"),
-				i18n("schema.column.submitTime", "提交时间"),
-				i18n("schema.column.duration", "填写时长"),
-				i18n("schema.column.device", "填写设备"),
-				i18n("schema.column.os", "操作系统"),
-				i18n("schema.column.browser", "浏览器"),
-				i18n("schema.column.region", "填写地区"),
-				i18n("schema.column.ip", "IP"),
-				i18n("schema.column.id", "ID")));
+		result.addAll(Arrays.asList(getOpenIdColumnName(), i18n("schema.column.submitter", "提交人"),
+				i18n("schema.column.submitTime", "提交时间"), i18n("schema.column.duration", "填写时长"),
+				i18n("schema.column.device", "填写设备"), i18n("schema.column.os", "操作系统"),
+				i18n("schema.column.browser", "浏览器"), i18n("schema.column.region", "填写地区"),
+				i18n("schema.column.ip", "IP"), i18n("schema.column.id", "ID")));
 
 		return result;
 	}
@@ -137,11 +139,10 @@ public class SchemaHelper {
 
 	/**
 	 * 转换答案为导出 excel 的行格式
-	 * 
 	 * @param answerInfo 单条答案记录
-	 * @param dataTypes  所有的问题 schema
-	 * @param index      当前行索引
-	 * @param mode       项目模式
+	 * @param dataTypes 所有的问题 schema
+	 * @param index 当前行索引
+	 * @param mode 项目模式
 	 * @return excel 行记录
 	 */
 	public static List<Object> parseRowData(AnswerView answerInfo, List<SurveySchema> dataTypes, int index,
@@ -168,7 +169,8 @@ public class SchemaHelper {
 			// 防止公式注入
 			avoidFormulaInjection(rowData);
 			return rowData;
-		} catch (Exception e) {
+		}
+		catch (Exception e) {
 			log.error("Failed to parse answer data, answerId: {}, error: {}", answerInfo.getId(), e.getMessage(), e);
 			return createErrorRowData(index);
 		}
@@ -203,23 +205,24 @@ public class SchemaHelper {
 		SurveySchema.QuestionType questionType = schemaType.getType();
 
 		switch (questionType) {
-			case Upload:
-			case Signature:
-				return parseFileQuestionValue(valueObj, answerInfo);
-			case Cascader:
-				return parseCascaderQuestionValue(schemaType, valueObj);
-			case User:
-				return parseUserQuestionValue(valueObj, answerInfo);
-			case Dept:
-				return parseDeptQuestionValue(valueObj, answerInfo);
-			case MatrixAuto:
-				return parseMatrixAutoQuestionValue(schemaType, valueObj);
-			default:
-				if (questionType.name().startsWith("Matrix")) {
-					return parseMatrixQuestionValue(schemaType, valueObj, questionType);
-				} else {
-					return parseStandardQuestionValue(schemaType, valueObj);
-				}
+		case Upload:
+		case Signature:
+			return parseFileQuestionValue(valueObj, answerInfo);
+		case Cascader:
+			return parseCascaderQuestionValue(schemaType, valueObj);
+		case User:
+			return parseUserQuestionValue(valueObj, answerInfo);
+		case Dept:
+			return parseDeptQuestionValue(valueObj, answerInfo);
+		case MatrixAuto:
+			return parseMatrixAutoQuestionValue(schemaType, valueObj);
+		default:
+			if (questionType.name().startsWith("Matrix")) {
+				return parseMatrixQuestionValue(schemaType, valueObj, questionType);
+			}
+			else {
+				return parseStandardQuestionValue(schemaType, valueObj);
+			}
 		}
 	}
 
@@ -228,21 +231,16 @@ public class SchemaHelper {
 	 */
 	private static String parseFileQuestionValue(Object valueObj, AnswerView answerInfo) {
 		Map<?, ?> mapValue = (Map<?, ?>) valueObj;
-		return mapValue.values().stream()
-				.map(x -> {
-					if (x instanceof String) {
-						return (String) x;
-					}
-					List<String> fileIds = (List<String>) x;
-					return fileIds.stream()
-							.map(id -> answerInfo.getAttachment().stream()
-									.filter(attachment -> attachment.getId().equals(id))
-									.findFirst()
-									.orElse(new FileView())
-									.getOriginalName())
-							.collect(Collectors.joining(","));
-				})
-				.collect(Collectors.joining(","));
+		return mapValue.values().stream().map(x -> {
+			if (x instanceof String) {
+				return (String) x;
+			}
+			List<String> fileIds = (List<String>) x;
+			return fileIds.stream()
+					.map(id -> answerInfo.getAttachment().stream().filter(attachment -> attachment.getId().equals(id))
+							.findFirst().orElse(new FileView()).getOriginalName())
+					.collect(Collectors.joining(","));
+		}).collect(Collectors.joining(","));
 	}
 
 	/**
@@ -256,10 +254,8 @@ public class SchemaHelper {
 		for (SurveySchema child : schemaType.getChildren()) {
 			String optionId = child.getId();
 			String optionValue = (String) mapValue.get(optionId);
-			SurveySchema.DataSource dataSource = dataSources.stream()
-					.filter(x -> x.getValue().equals(optionValue))
-					.findFirst()
-					.orElse(new SurveySchema.DataSource("", "", new ArrayList<>()));
+			SurveySchema.DataSource dataSource = dataSources.stream().filter(x -> x.getValue().equals(optionValue))
+					.findFirst().orElse(new SurveySchema.DataSource("", "", new ArrayList<>()));
 			result.add(dataSource.getLabel());
 			dataSources = dataSource.getChildren();
 			if (dataSources == null) {
@@ -274,18 +270,11 @@ public class SchemaHelper {
 	 */
 	private static String parseUserQuestionValue(Object valueObj, AnswerView answerInfo) {
 		Map<?, ?> mapValue = (Map<?, ?>) valueObj;
-		return mapValue.values().stream()
-				.map(x -> {
-					List<String> userIds = (List<String>) x;
-					return userIds.stream()
-							.map(id -> answerInfo.getUsers().stream()
-									.filter(user -> user.getUserId().equals(id))
-									.findFirst()
-									.orElse(new UserInfo())
-									.getName())
-							.collect(Collectors.joining(","));
-				})
-				.collect(Collectors.joining(","));
+		return mapValue.values().stream().map(x -> {
+			List<String> userIds = (List<String>) x;
+			return userIds.stream().map(id -> answerInfo.getUsers().stream().filter(user -> user.getUserId().equals(id))
+					.findFirst().orElse(new UserInfo()).getName()).collect(Collectors.joining(","));
+		}).collect(Collectors.joining(","));
 	}
 
 	/**
@@ -293,18 +282,11 @@ public class SchemaHelper {
 	 */
 	private static String parseDeptQuestionValue(Object valueObj, AnswerView answerInfo) {
 		Map<?, ?> mapValue = (Map<?, ?>) valueObj;
-		return mapValue.values().stream()
-				.map(x -> {
-					List<String> deptIds = (List<String>) x;
-					return deptIds.stream()
-							.map(id -> answerInfo.getDepts().stream()
-									.filter(dept -> dept.getId().equals(id))
-									.findFirst()
-									.orElse(new DeptView())
-									.getName())
-							.collect(Collectors.joining(","));
-				})
-				.collect(Collectors.joining(","));
+		return mapValue.values().stream().map(x -> {
+			List<String> deptIds = (List<String>) x;
+			return deptIds.stream().map(id -> answerInfo.getDepts().stream().filter(dept -> dept.getId().equals(id))
+					.findFirst().orElse(new DeptView()).getName()).collect(Collectors.joining(","));
+		}).collect(Collectors.joining(","));
 	}
 
 	/**
@@ -312,8 +294,7 @@ public class SchemaHelper {
 	 */
 	private static String parseStandardQuestionValue(SurveySchema schemaType, Object valueObj) {
 		return schemaType.getChildren().stream()
-				.map(optionSchema -> parseOptionValue(schemaType, optionSchema, valueObj))
-				.filter(Objects::nonNull)
+				.map(optionSchema -> parseOptionValue(schemaType, optionSchema, valueObj)).filter(Objects::nonNull)
 				.collect(Collectors.joining(","));
 	}
 
@@ -373,11 +354,9 @@ public class SchemaHelper {
 	 */
 	private static String parseSelectValue(SurveySchema optionSchema, Object optionValue) {
 		Optional<SurveySchema.DataSource> findDataSource = optionSchema.getDataSource().stream()
-				.filter(x -> x.getValue().equals(optionValue))
-				.findFirst();
+				.filter(x -> x.getValue().equals(optionValue)).findFirst();
 
-		return findDataSource.map(SurveySchema.DataSource::getLabel)
-				.orElse(optionValue.toString());
+		return findDataSource.map(SurveySchema.DataSource::getLabel).orElse(optionValue.toString());
 	}
 
 	/**
@@ -389,25 +368,19 @@ public class SchemaHelper {
 			List<String> matrixRowData = new ArrayList<>();
 			rowValue.forEach((optionId, v) -> {
 				SurveySchema optionSchema = schemaType.getChildren().stream()
-						.filter(option -> option.getId().equals(optionId))
-						.findFirst()
-						.orElse(null);
+						.filter(option -> option.getId().equals(optionId)).findFirst().orElse(null);
 
 				if (optionSchema != null && optionSchema.getDataSource() != null) {
-					String label = optionSchema.getDataSource().stream()
-							.filter(x -> x.getValue().equals(v))
-							.findFirst()
-							.orElse(new SurveySchema.DataSource())
-							.getLabel();
+					String label = optionSchema.getDataSource().stream().filter(x -> x.getValue().equals(v)).findFirst()
+							.orElse(new SurveySchema.DataSource()).getLabel();
 					matrixRowData.add(label);
-				} else if (v instanceof Boolean) {
-					String title = trimHtmlTag(schemaType.getChildren().stream()
-							.filter(x -> x.getId().equals(optionId))
-							.findFirst()
-							.orElseGet(SurveySchema::new)
-							.getTitle());
+				}
+				else if (v instanceof Boolean) {
+					String title = trimHtmlTag(schemaType.getChildren().stream().filter(x -> x.getId().equals(optionId))
+							.findFirst().orElseGet(SurveySchema::new).getTitle());
 					matrixRowData.add(title);
-				} else {
+				}
+				else {
 					matrixRowData.add(String.valueOf(v));
 				}
 			});
@@ -423,22 +396,17 @@ public class SchemaHelper {
 			SurveySchema.QuestionType questionType) {
 		List<String> result = new ArrayList<>();
 		((Map<?, ?>) valueObj).forEach((optionId, valueMap) -> {
-			String title = trimHtmlTag(schemaType.getRow().stream()
-					.filter(x -> x.getId().equals(optionId))
-					.findFirst()
-					.orElseGet(SurveySchema.Row::new)
-					.getTitle());
+			String title = trimHtmlTag(schemaType.getRow().stream().filter(x -> x.getId().equals(optionId)).findFirst()
+					.orElseGet(SurveySchema.Row::new).getTitle());
 
 			List<String> valueList = new ArrayList<>();
 			((LinkedHashMap<?, ?>) valueMap).forEach((childOptId, val) -> {
 				if (val != null) {
-					String processedValue = schemaType.getChildren().stream()
-							.filter(x -> x.getId().equals(childOptId))
-							.findFirst()
-							.map(x -> processMatrixCellValue(x, val, questionType))
-							.orElse("");
+					String processedValue = schemaType.getChildren().stream().filter(x -> x.getId().equals(childOptId))
+							.findFirst().map(x -> processMatrixCellValue(x, val, questionType)).orElse("");
 					valueList.add(trimHtmlTag(processedValue));
-				} else {
+				}
+				else {
 					valueList.add("");
 				}
 			});
@@ -454,13 +422,13 @@ public class SchemaHelper {
 			SurveySchema.QuestionType questionType) {
 		if (!CollectionUtils.isEmpty(cellSchema.getDataSource())) {
 			Optional<SurveySchema.DataSource> findDataSource = cellSchema.getDataSource().stream()
-					.filter(data -> data.getValue().equals(val))
-					.findFirst();
-			return findDataSource.map(SurveySchema.DataSource::getLabel)
-					.orElse(String.valueOf(val));
-		} else if (SurveySchema.QuestionType.MatrixFillBlank.equals(questionType)) {
+					.filter(data -> data.getValue().equals(val)).findFirst();
+			return findDataSource.map(SurveySchema.DataSource::getLabel).orElse(String.valueOf(val));
+		}
+		else if (SurveySchema.QuestionType.MatrixFillBlank.equals(questionType)) {
 			return String.valueOf(val);
-		} else {
+		}
+		else {
 			return cellSchema.getTitle();
 		}
 	}
@@ -472,7 +440,8 @@ public class SchemaHelper {
 		if (answer.containsKey("openid")) {
 			rowData.add(answer.get("openid"));
 			localOpenId.set(true);
-		} else {
+		}
+		else {
 			rowData.add("");
 		}
 	}
@@ -494,15 +463,11 @@ public class SchemaHelper {
 		// 客户端信息
 		if (answerInfo.getMetaInfo() == null || answerInfo.getMetaInfo().getClientInfo() == null) {
 			rowData.addAll(Arrays.asList("", "", "", "", "", ""));
-		} else {
+		}
+		else {
 			AnswerMetaInfo.ClientInfo clientInfo = answerInfo.getMetaInfo().getClientInfo();
-			rowData.addAll(Arrays.asList(
-					clientInfo.getDeviceType(),
-					clientInfo.getPlatform(),
-					clientInfo.getBrowser(),
-					clientInfo.getRegion(),
-					clientInfo.getRemoteIp(),
-					answerInfo.getId()));
+			rowData.addAll(Arrays.asList(clientInfo.getDeviceType(), clientInfo.getPlatform(), clientInfo.getBrowser(),
+					clientInfo.getRegion(), clientInfo.getRemoteIp(), answerInfo.getId()));
 		}
 	}
 
@@ -533,7 +498,8 @@ public class SchemaHelper {
 				String[] dictValueAndLabel = subOptionValue.split("\\|", 2);
 				if (dictValueAndLabel.length > 1) {
 					result.add(dictValueAndLabel[1]);
-				} else {
+				}
+				else {
 					// 兼容历史版本
 					result.add(dictValueAndLabel[0]);
 				}
@@ -544,10 +510,12 @@ public class SchemaHelper {
 						.filter(x -> x.getValue().equals(subOptionValue)).findFirst();
 				if (findDataSource.isPresent()) {
 					result.add(findDataSource.get().getLabel());
-				} else {
+				}
+				else {
 					result.add(subOptionValue);
 				}
-			} else {
+			}
+			else {
 				result.add(subOptionValue);
 			}
 		}
@@ -555,9 +523,7 @@ public class SchemaHelper {
 	}
 
 	/**
-	 * 移除HTML标签和实体字符
-	 * 更好的方式是使用 Jsoup.parse(html).text(); 但是我不想引入过多的第三方 jar
-	 * 
+	 * 移除HTML标签和实体字符 更好的方式是使用 Jsoup.parse(html).text(); 但是我不想引入过多的第三方 jar
 	 * @param string 包含HTML标签的字符串
 	 * @return 清理后的纯文本字符串
 	 */
@@ -565,16 +531,13 @@ public class SchemaHelper {
 		if (StringUtils.isBlank(string)) {
 			return "";
 		}
-		return string.replaceAll(HTML_TAG_REGEX, " ")
-				.replaceAll(MULTIPLE_SPACES_REGEX, " ")
-				.trim();
+		return string.replaceAll(HTML_TAG_REGEX, " ").replaceAll(MULTIPLE_SPACES_REGEX, " ").trim();
 	}
 
 	/**
 	 * 根据字段权限更新Schema
-	 * 
 	 * @param fieldPermission 字段权限映射
-	 * @param schema          Schema对象
+	 * @param schema Schema对象
 	 */
 	public static void updateSchemaByPermission(LinkedHashMap<String, Integer> fieldPermission, SurveySchema schema) {
 		if (schema.getChildren() == null || fieldPermission == null || fieldPermission.isEmpty()) {
@@ -590,8 +553,7 @@ public class SchemaHelper {
 
 	/**
 	 * 处理子项权限
-	 * 
-	 * @param child           子项Schema
+	 * @param child 子项Schema
 	 * @param fieldPermission 字段权限映射
 	 * @return 是否应该移除该子项
 	 */
@@ -617,7 +579,6 @@ public class SchemaHelper {
 
 	/**
 	 * 确保Schema具有Attribute对象
-	 * 
 	 * @param schema Schema对象
 	 */
 	private static void ensureAttributeExists(SurveySchema schema) {
@@ -628,7 +589,6 @@ public class SchemaHelper {
 
 	/**
 	 * 移除 schema 里面的指定属性值
-	 * 
 	 * @param schema
 	 * @param attributes
 	 */
@@ -649,7 +609,6 @@ public class SchemaHelper {
 
 	/**
 	 * 根据属性名和属性值找到所有满足条件的子 schema 列表
-	 * 
 	 * @param schema
 	 * @param attributeName
 	 * @param attributeValue
@@ -671,7 +630,6 @@ public class SchemaHelper {
 
 	/**
 	 * 根据属性名查找子 schema 列表
-	 * 
 	 * @param schema
 	 * @param attributeName
 	 */
@@ -692,7 +650,6 @@ public class SchemaHelper {
 
 	/**
 	 * 主要是用于构建 FillBlank 类型的查询表单
-	 * 
 	 * @param field
 	 * @return
 	 */
@@ -714,9 +671,8 @@ public class SchemaHelper {
 
 	/**
 	 * 将问题 schema 添加到问卷里面
-	 * 
 	 * @param parent 问卷 schema
-	 * @param child  问题 schema
+	 * @param child 问题 schema
 	 */
 	public static void appendChildIfNotExist(SurveySchema parent, SurveySchema child) {
 		boolean exists = flatSurveySchema(parent).stream().anyMatch(x -> child.getId().equals(x.getId()));
@@ -746,9 +702,7 @@ public class SchemaHelper {
 	}
 
 	/**
-	 * 防止Excel公式注入攻击
-	 * 在可能包含公式的字符串前添加单引号
-	 * 
+	 * 防止Excel公式注入攻击 在可能包含公式的字符串前添加单引号
 	 * @param rowData 行数据列表
 	 */
 	private static void avoidFormulaInjection(List<Object> rowData) {
@@ -765,7 +719,6 @@ public class SchemaHelper {
 
 	/**
 	 * 检查字符串是否有公式注入风险
-	 * 
 	 * @param str 待检查的字符串
 	 * @return 是否有风险
 	 */
@@ -774,13 +727,11 @@ public class SchemaHelper {
 			return false;
 		}
 
-		return Arrays.stream(FORMULA_INJECTION_PREFIXES)
-				.anyMatch(str::startsWith);
+		return Arrays.stream(FORMULA_INJECTION_PREFIXES).anyMatch(str::startsWith);
 	}
 
 	/**
 	 * 构建 linkSurvey 的查询条件
-	 * 
 	 * @param linkSurvey
 	 * @param value
 	 * @return
@@ -795,7 +746,6 @@ public class SchemaHelper {
 
 	/**
 	 * 解析人类可读的时长格式
-	 * 
 	 * @param answerInfo 答案信息
 	 * @return 格式化的时长字符串，如 "1天2小时30分钟15秒"
 	 */
@@ -814,7 +764,8 @@ public class SchemaHelper {
 			}
 
 			return formatDuration(duration);
-		} catch (Exception e) {
+		}
+		catch (Exception e) {
 			log.warn("Failed to parse duration: {}", e.getMessage());
 			return "";
 		}
@@ -822,7 +773,6 @@ public class SchemaHelper {
 
 	/**
 	 * 格式化时长
-	 * 
 	 * @param duration 时长（毫秒）
 	 * @return 格式化的时长字符串
 	 */
@@ -871,7 +821,8 @@ public class SchemaHelper {
 			this.data = data;
 			if (parent == null) {
 				this.root = this;
-			} else {
+			}
+			else {
 				this.root = parent.root;
 				this.parent = parent;
 			}
@@ -899,10 +850,10 @@ public class SchemaHelper {
 
 	public enum LoginFormFieldEnum {
 
-		username("schema.login.username", "用户名", SurveySchema.DataType.text),
-		password("schema.login.password", "密码", SurveySchema.DataType.password),
-		extraPassword("schema.login.extraPassword", "请输入问卷密码", SurveySchema.DataType.text),
-		whitelistName("schema.login.whitelistName", "请先输入名单，再进行填写", SurveySchema.DataType.text);
+		username("schema.login.username", "用户名", SurveySchema.DataType.text), password("schema.login.password", "密码",
+				SurveySchema.DataType.password), extraPassword("schema.login.extraPassword", "请输入问卷密码",
+						SurveySchema.DataType.text), whitelistName("schema.login.whitelistName", "请先输入名单，再进行填写",
+								SurveySchema.DataType.text);
 
 		private final String titleKey;
 

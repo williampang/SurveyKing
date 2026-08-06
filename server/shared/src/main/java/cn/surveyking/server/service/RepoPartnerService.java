@@ -14,4 +14,5 @@ public interface RepoPartnerService {
 	void deleteRepoPartner(RepoPartnerRequest request);
 
 	boolean hasPracticePermission(String repoId, String userId);
+
 }

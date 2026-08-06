@@ -26,7 +26,7 @@ public class LocalStorageService extends AbstractStorageService {
 	@Override
 	public void init() {
 		try {
-			this.rootLocation = Paths.get(getStorageConfig().getLocal().getRootPath());
+			this.rootLocation = Paths.get(getStorageConfig().getLocal().getRootPath()).toAbsolutePath().normalize();
 			Files.createDirectories(rootLocation);
 		}
 		catch (UnknownHostException e) {
@@ -44,7 +44,8 @@ public class LocalStorageService extends AbstractStorageService {
 		try (InputStream inputStream = file) {
 			Files.createDirectories(destinationFile.getParent());
 			Files.copy(inputStream, destinationFile, StandardCopyOption.REPLACE_EXISTING);
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
 			e.printStackTrace();
 			throw new ErrorCodeException(ErrorCode.FileUploadError);
 		}
@@ -52,7 +53,7 @@ public class LocalStorageService extends AbstractStorageService {
 
 	private Path resolvePath(String path) {
 		Path normalizedPath = Paths.get(path).normalize();
-		Path destinationPath = this.rootLocation.resolve(normalizedPath);
+		Path destinationPath = this.rootLocation.resolve(normalizedPath).toAbsolutePath().normalize();
 
 		// Ensure the destination path is within the root location
 		if (!destinationPath.startsWith(this.rootLocation)) {
@@ -68,7 +69,8 @@ public class LocalStorageService extends AbstractStorageService {
 
 		try {
 			return Files.readAllBytes(resolvedPath);
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
 			e.printStackTrace();
 			throw new ErrorCodeException(ErrorCode.FileNotExists);
 		}
@@ -77,7 +79,7 @@ public class LocalStorageService extends AbstractStorageService {
 	@Override
 	public InputStream downloadAsStream(String filePath) {
 		try {
-			return Files.newInputStream(rootLocation.resolve(filePath));
+			return Files.newInputStream(resolvePath(filePath));
 		}
 		catch (IOException e) {
 			throw new ErrorCodeException(ErrorCode.FileNotExists);

@@ -9,13 +9,15 @@ import lombok.Data;
  */
 @Data
 public class ConversationRequest {
-    /**
-     * 会话标题
-     */
-    private String title;
-    
-    /**
-     * 模型类型
-     */
-    private String modelType;
+
+	/**
+	 * 会话标题
+	 */
+	private String title;
+
+	/**
+	 * 模型类型
+	 */
+	private String modelType;
+
 }

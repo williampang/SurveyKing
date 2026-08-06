@@ -10,6 +10,8 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.WebUtils;
@@ -72,10 +74,9 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 
 			// Execute login
 			if (tokenFromCookie == null && tokenFromParameter != null) {
-				Cookie cookie = new Cookie(AppConsts.TOKEN_NAME, tokenFromParameter);
-				cookie.setPath("/");
-				cookie.setHttpOnly(true);
-				response.addCookie(cookie);
+				ResponseCookie cookie = ResponseCookie.from(AppConsts.TOKEN_NAME, tokenFromParameter).path("/")
+						.httpOnly(true).secure(request.isSecure()).sameSite("Lax").build();
+				response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 			}
 
 			chain.doFilter(request, response);

@@ -25,6 +25,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import java.util.List;
 import java.util.Optional;
@@ -38,101 +39,100 @@ import java.util.Optional;
 @RequestMapping("${api.prefix}")
 public class UserApi {
 
-    private final UserService userService;
+	private final UserService userService;
 
-    private final AuthenticationManager authenticationManager;
+	private final AuthenticationManager authenticationManager;
 
-    private final JwtTokenUtil jwtTokenUtil;
+	private final JwtTokenUtil jwtTokenUtil;
 
-    @PostMapping("/public/login")
-    public ResponseEntity login(@RequestBody @Valid AuthRequest request) {
-        Authentication authentication;
-        try {
-            String decryptPwd = RSAUtils.decrypt(request.getPassword());
-            authentication = new UsernamePasswordAuthenticationToken(request.getUsername(), decryptPwd);
-            Authentication authenticate = authenticationManager.authenticate(authentication);
-            UserInfo user = (UserInfo) authenticate.getPrincipal();
-            HttpCookie cookie = ResponseCookie
-                    .from(AppConsts.TOKEN_NAME, jwtTokenUtil.generateAccessToken(new UserTokenView(user.getUserId())))
-                    .path("/").httpOnly(true).build();
-            return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
-                    .header(HttpHeaders.AUTHORIZATION,
-                            jwtTokenUtil.generateAccessToken(new UserTokenView(user.getUserId())))
-                    .build();
-        } catch (Exception e) {
-            throw new ErrorCodeException(ErrorCode.UsernameOrPasswordError);
-        }
-    }
+	@PostMapping("/public/login")
+	public ResponseEntity login(@RequestBody @Valid AuthRequest request, HttpServletRequest httpRequest) {
+		Authentication authentication;
+		try {
+			String decryptPwd = RSAUtils.decrypt(request.getPassword());
+			authentication = new UsernamePasswordAuthenticationToken(request.getUsername(), decryptPwd);
+			Authentication authenticate = authenticationManager.authenticate(authentication);
+			UserInfo user = (UserInfo) authenticate.getPrincipal();
+			HttpCookie cookie = ResponseCookie
+					.from(AppConsts.TOKEN_NAME, jwtTokenUtil.generateAccessToken(new UserTokenView(user.getUserId())))
+					.path("/").httpOnly(true).secure(httpRequest.isSecure()).sameSite("Lax").build();
+			return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
+					.header(HttpHeaders.AUTHORIZATION,
+							jwtTokenUtil.generateAccessToken(new UserTokenView(user.getUserId())))
+					.build();
+		}
+		catch (Exception e) {
+			throw new ErrorCodeException(ErrorCode.UsernameOrPasswordError);
+		}
+	}
 
-    @PostMapping("/public/logout")
-    public ResponseEntity logout() {
-        HttpCookie cookie = ResponseCookie.from(AppConsts.TOKEN_NAME, "").path("/").httpOnly(true).maxAge(0).build();
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).build();
-    }
+	@PostMapping("/public/logout")
+	public ResponseEntity logout(HttpServletRequest httpRequest) {
+		HttpCookie cookie = ResponseCookie.from(AppConsts.TOKEN_NAME, "").path("/").httpOnly(true)
+				.secure(httpRequest.isSecure()).sameSite("Lax").maxAge(0).build();
+		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).build();
+	}
 
-    @PostMapping("/public/register")
-    public void register(@RequestBody RegisterRequest request) {
-        userService.register(request);
-    }
+	@PostMapping("/public/register")
+	public void register(@RequestBody RegisterRequest request) {
+		userService.register(request);
+	}
 
-    @GetMapping("/currentUser")
-    @PreAuthorize("isAuthenticated()")
-    public UserInfo currentUser() {
-        return userService.loadUserById(SecurityContextUtils.getUserId());
-    }
+	@GetMapping("/currentUser")
+	@PreAuthorize("isAuthenticated()")
+	public UserInfo currentUser() {
+		return userService.loadUserById(SecurityContextUtils.getUserId());
+	}
 
-    @GetMapping("/userOverview")
-    @PreAuthorize("isAuthenticated()")
-    public UserOverview userOverview() {
-        return userService.getUserOverviewData();
-    }
+	@GetMapping("/userOverview")
+	@PreAuthorize("isAuthenticated()")
+	public UserOverview userOverview() {
+		return userService.getUserOverviewData();
+	}
 
-    @PostMapping("/user")
-    @PreAuthorize("hasAuthority('user:update')")
-    public UserInfo updateUser(@RequestBody UserRequest request) {
-        // 只有本人才能通过调用这个接口修改个人信息
-        request.setId(SecurityContextUtils.getUserId());
-        userService.updateUser(request);
-        return userService.loadUserById(SecurityContextUtils.getUserId());
-    }
+	@PostMapping("/user")
+	@PreAuthorize("hasAuthority('user:update')")
+	public UserInfo updateUser(@RequestBody UserRequest request) {
+		// 只有本人才能通过调用这个接口修改个人信息
+		request.setId(SecurityContextUtils.getUserId());
+		userService.updateUser(request);
+		return userService.loadUserById(SecurityContextUtils.getUserId());
+	}
 
-    @GetMapping("/public/listRegisterRole")
-    public List<RegisterRoleView> getRegisterRoles() {
-        return userService.getRegisterRoles();
-    }
+	@GetMapping("/public/listRegisterRole")
+	public List<RegisterRoleView> getRegisterRoles() {
+		return userService.getRegisterRoles();
+	}
 
-    /**
-     * 导入用户
-     *
-     * @param request
-     */
-    @PostMapping("/importUser")
-    @PreAuthorize("hasAuthority('home')")
-    public void importUser(UserRequest request) {
-        userService.importUser(request);
-    }
+	/**
+	 * 导入用户
+	 * @param request
+	 */
+	@PostMapping("/importUser")
+	@PreAuthorize("hasAuthority('home')")
+	public void importUser(UserRequest request) {
+		userService.importUser(request);
+	}
 
-    /**
-     * 查询用户任务
-     *
-     * @param query
-     * @return
-     */
-    @GetMapping("/listUserTask")
-    @PreAuthorize("hasAuthority('home')")
-    public PaginationResponse<MyTaskView> myTask(MyTaskQuery query) {
-        return userService.queryTask(query);
-    }
+	/**
+	 * 查询用户任务
+	 * @param query
+	 * @return
+	 */
+	@GetMapping("/listUserTask")
+	@PreAuthorize("hasAuthority('home')")
+	public PaginationResponse<MyTaskView> myTask(MyTaskQuery query) {
+		return userService.queryTask(query);
+	}
 
-    /**
-     * 查询历史任务
-     *
-     * @param query
-     * @return
-     */
-    @GetMapping("/listHistoryTask")
-    public PaginationResponse<MyTaskView> myHistoryTask(MyTaskQuery query) {
-        return userService.queryHistoryTask(query);
-    }
+	/**
+	 * 查询历史任务
+	 * @param query
+	 * @return
+	 */
+	@GetMapping("/listHistoryTask")
+	public PaginationResponse<MyTaskView> myHistoryTask(MyTaskQuery query) {
+		return userService.queryHistoryTask(query);
+	}
 
 }

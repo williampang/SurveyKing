@@ -49,8 +49,8 @@ processResources {
     if (isProd) {
         exclude("application-dev.yml", "generatorConfig.xml")
     }
-    // will replace the ${activeProfile} to activeProfile value in application.yml
+    // 仅替换 Maven 同样使用的 profile 标记，保留 Spring 环境变量占位符
     filesMatching('application.yml') {
-        expand(project.properties)
+        filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: [activeProfile: activeProfile])
     }
 }

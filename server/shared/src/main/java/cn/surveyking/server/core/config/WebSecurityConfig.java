@@ -5,7 +5,6 @@ import cn.surveyking.server.core.security.RestAuthenticationEntryPoint;
 import cn.surveyking.server.service.UserService;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
@@ -18,6 +17,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author javahuang
@@ -32,6 +34,8 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 	 * 开启 url token 认证
 	 */
 	private final UrlTokenAuthentication urlTokenAuthentication = new UrlTokenAuthentication();
+
+	private final Cors cors = new Cors();
 
 	private final JwtTokenFilter jwtTokenFilter;
 
@@ -65,17 +69,20 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 		// 所有请求都放行，目的是单 jar 部署，输入任意路由也能跳转到对应的页面，权限拦截通过注解配置
 
 		http.authorizeRequests().antMatchers("/api/public/**").permitAll().antMatchers("/api/system").permitAll()
-				.antMatchers("/captcha/get", "/captcha/check").permitAll().antMatchers(HttpMethod.GET, "/api/file/**")
-				.permitAll().antMatchers("/api/**").authenticated().antMatchers("/").permitAll();
+				.antMatchers("/captcha/get", "/captcha/check").permitAll().antMatchers("/api/**").authenticated()
+				.antMatchers("/").permitAll();
 		http.addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class);
 	}
 
 	@Bean
 	public CorsFilter corsFilter() {
 		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+		if (cors.getAllowedOriginPatterns().isEmpty()) {
+			return new CorsFilter(source);
+		}
 		CorsConfiguration config = new CorsConfiguration();
 		config.setAllowCredentials(true);
-		config.addAllowedOriginPattern("*");
+		config.setAllowedOriginPatterns(cors.getAllowedOriginPatterns());
 		config.addAllowedHeader("*");
 		config.addAllowedMethod("*");
 		source.registerCorsConfiguration("/**", config);
@@ -99,12 +106,16 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 		return urlTokenAuthentication;
 	}
 
+	public Cors getCors() {
+		return cors;
+	}
+
 	public static class UrlTokenAuthentication {
 
 		/**
 		 * 是否开启 token 认证
 		 */
-		private boolean enabled = true;
+		private boolean enabled = false;
 
 		public boolean isEnabled() {
 			return this.enabled;
@@ -112,6 +123,20 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 
 		public void setEnabled(boolean enabled) {
 			this.enabled = enabled;
+		}
+
+	}
+
+	public static class Cors {
+
+		private List<String> allowedOriginPatterns = new ArrayList<>();
+
+		public List<String> getAllowedOriginPatterns() {
+			return allowedOriginPatterns;
+		}
+
+		public void setAllowedOriginPatterns(List<String> allowedOriginPatterns) {
+			this.allowedOriginPatterns = allowedOriginPatterns == null ? new ArrayList<>() : allowedOriginPatterns;
 		}
 
 	}

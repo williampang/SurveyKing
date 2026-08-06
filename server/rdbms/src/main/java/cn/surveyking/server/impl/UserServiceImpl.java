@@ -246,7 +246,7 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 		if (request.getStatus() != null || isNotBlank(request.getPassword())) {
 			// 更新登录账号
 			Account account = accountMapper
-				.selectOne(Wrappers.<Account>lambdaQuery().eq(Account::getUserId, request.getId()));
+					.selectOne(Wrappers.<Account>lambdaQuery().eq(Account::getUserId, request.getId()));
 			if (isNotBlank(request.getPassword()) && isNotBlank(request.getOldPassword())) {
 				if (!passwordEncoder.matches(request.getOldPassword(), account.getAuthSecret())) {
 					throw new InternalServerError(i18n("user.password.invalid"));
@@ -434,18 +434,16 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 						Arrays.asList(ProjectPartnerTypeEnum.OWNER.getType(),
 								ProjectPartnerTypeEnum.COLLABORATOR.getType()))
 				.eq(ProjectPartner::getUserId, SecurityContextUtils.getUserId())
-				.exists(String.format(
-						"SELECT 1 FROM t_project t WHERE t.mode = '%s' AND t.id = t_project_partner.project_id",
-						ProjectModeEnum.survey.name()))));
+				.exists("SELECT 1 FROM t_project t WHERE t.mode = {0} AND t.id = t_project_partner.project_id",
+						ProjectModeEnum.survey.name())));
 
 		userOverview.setExamCount(partnerService.count(Wrappers.<ProjectPartner>lambdaQuery()
 				.in(ProjectPartner::getType,
 						Arrays.asList(ProjectPartnerTypeEnum.OWNER.getType(),
 								ProjectPartnerTypeEnum.COLLABORATOR.getType()))
 				.eq(ProjectPartner::getUserId, SecurityContextUtils.getUserId())
-				.exists(String.format(
-						"SELECT 1 FROM t_project t WHERE t.mode = '%s' AND t.id = t_project_partner.project_id",
-						ProjectModeEnum.exam.name()))));
+				.exists("SELECT 1 FROM t_project t WHERE t.mode = {0} AND t.id = t_project_partner.project_id",
+						ProjectModeEnum.exam.name())));
 		return userOverview;
 	}
 
@@ -502,11 +500,12 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 							if (CollectionUtils.isEmpty(roleNames)) {
 								throw new InternalServerError(i18n("user.import.roleNotFound", rowNum[0], roles));
 							}
-							List<String> missingRoleNames = roleNames.stream().filter(roleName -> !roleName2Id.containsKey(roleName))
+							List<String> missingRoleNames = roleNames.stream()
+									.filter(roleName -> !roleName2Id.containsKey(roleName))
 									.collect(Collectors.toList());
 							if (!CollectionUtils.isEmpty(missingRoleNames)) {
-								throw new InternalServerError(
-										i18n("user.import.roleNotFound", rowNum[0], String.join("、", missingRoleNames)));
+								throw new InternalServerError(i18n("user.import.roleNotFound", rowNum[0],
+										String.join("、", missingRoleNames)));
 							}
 							List<String> roleIds = roleNames.stream().map(roleName2Id::get).distinct()
 									.collect(Collectors.toList());
@@ -530,8 +529,8 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 
 	private List<String> parseImportRoleNames(String roles, Map<String, String> roleName2Id) {
 		String normalizedRoles = roles.trim();
-		List<String> roleNames = Arrays.stream(normalizedRoles.split("\\s*[,，、;；\\r\\n]+\\s*"))
-				.map(String::trim).filter(StringUtils::hasText).distinct().collect(Collectors.toList());
+		List<String> roleNames = Arrays.stream(normalizedRoles.split("\\s*[,，、;；\\r\\n]+\\s*")).map(String::trim)
+				.filter(StringUtils::hasText).distinct().collect(Collectors.toList());
 		if (roleNames.size() == 1 && normalizedRoles.matches(".*\\s+.*")
 				&& !roleName2Id.containsKey(roleNames.get(0))) {
 			roleNames = Arrays.stream(normalizedRoles.split("\\s+")).map(String::trim).filter(StringUtils::hasText)

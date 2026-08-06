@@ -71,7 +71,7 @@ public class ProjectApi {
 	 */
 	@GetMapping("/setting")
 	@PreAuthorize("hasAuthority('project:detail')")
-	@EnableDataPerm(key = "#id")
+	@EnableDataPerm(key = "#query.id")
 	public ProjectSetting getSetting(ProjectQuery query) {
 		return projectService.getSetting(query);
 	}
@@ -115,6 +115,7 @@ public class ProjectApi {
 	 * @return
 	 */
 	@GetMapping("/partner/list")
+	@PreAuthorize("hasAuthority('project:detail')")
 	@EnableDataPerm(key = "#query.projectId")
 	public PaginationResponse<ProjectPartnerView> listProjectPartner(ProjectPartnerQuery query) {
 		return projectPartnerService.listProjectPartner(query);
@@ -125,6 +126,7 @@ public class ProjectApi {
 	 * @param request
 	 */
 	@PostMapping("/partner/create")
+	@PreAuthorize("hasAuthority('project:update')")
 	@EnableDataPerm(key = "#request.projectId")
 	public void addProjectPartner(@RequestBody ProjectPartnerRequest request) {
 		projectPartnerService.addProjectPartner(request);
@@ -135,6 +137,7 @@ public class ProjectApi {
 	 * @param request
 	 */
 	@PostMapping("/partner/delete")
+	@PreAuthorize("hasAuthority('project:update')")
 	@EnableDataPerm(key = "#request.projectId")
 	public void deleteProjectPartner(@RequestBody ProjectPartnerRequest request) {
 		projectPartnerService.deleteProjectPartner(request);
@@ -145,6 +148,7 @@ public class ProjectApi {
 	 * @param query
 	 */
 	@GetMapping("/partner/download")
+	@PreAuthorize("hasAuthority('project:detail')")
 	@EnableDataPerm(key = "#query.projectId")
 	public void downloadPartner(ProjectPartnerQuery query) {
 		projectPartnerService.downloadPartner(query);
@@ -155,6 +159,7 @@ public class ProjectApi {
 	 * @param request
 	 */
 	@PostMapping("/partner/import")
+	@PreAuthorize("hasAuthority('project:update')")
 	@EnableDataPerm(key = "#request.projectId")
 	public void importPartner(WhiteListRequest request) {
 		projectPartnerService.importPartner(request);

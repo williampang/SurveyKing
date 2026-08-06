@@ -22,4 +22,5 @@ public class RepoPartner extends BaseModel {
 
 	@TableField(exist = false)
 	private Boolean deleted = false;
+
 }

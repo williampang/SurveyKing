@@ -8,13 +8,12 @@ import java.time.Duration;
 
 @Configuration
 public class AiConfiguration {
-    @Bean
-    public WebClient webClient(WebClient.Builder builder) {
-        return builder
-                .codecs(configurer -> configurer
-                        .defaultCodecs()
-                        .maxInMemorySize(16 * 1024 * 1024)) // 16MB buffer
-                .build();
-    }
+
+	@Bean
+	public WebClient webClient(WebClient.Builder builder) {
+		return builder.codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)) // 16MB
+																											// buffer
+				.build();
+	}
 
 }

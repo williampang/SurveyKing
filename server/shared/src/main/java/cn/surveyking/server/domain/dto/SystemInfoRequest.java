@@ -41,6 +41,6 @@ public class SystemInfoRequest {
 
 	private SystemInfo.SystemSetting setting;
 
-	private  SystemInfo.AiSetting aiSetting;
+	private SystemInfo.AiSetting aiSetting;
 
 }

@@ -12,4 +12,5 @@ public class RepoPartnerRequest {
 	private String repoId;
 
 	private List<String> userIds;
+
 }

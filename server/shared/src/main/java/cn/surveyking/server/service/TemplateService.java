@@ -32,4 +32,5 @@ public interface TemplateService {
 	Set<String> getTags(TagQuery query);
 
 	TemplateView getTemplate(TemplateQuery query);
+
 }

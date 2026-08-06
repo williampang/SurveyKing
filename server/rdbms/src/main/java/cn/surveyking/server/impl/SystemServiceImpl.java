@@ -72,7 +72,8 @@ public class SystemServiceImpl implements SystemService {
 		mergeSysInfo(sysInfo, request);
 		if (exists) {
 			sysInfoMapper.updateById(sysInfo);
-		} else {
+		}
+		else {
 			sysInfoMapper.insert(sysInfo);
 		}
 	}
@@ -100,11 +101,13 @@ public class SystemServiceImpl implements SystemService {
 				userRole.setRoleId(request.getId());
 				userRoleMapper.insert(userRole);
 			}
-		} else if (!CollectionUtils.isEmpty(request.getEvictUserIds())) {
+		}
+		else if (!CollectionUtils.isEmpty(request.getEvictUserIds())) {
 			// 批量移除用户角色
 			userRoleMapper.delete(Wrappers.<UserRole>lambdaUpdate().eq(UserRole::getRoleId, request.getId())
 					.in(UserRole::getUserId, request.getEvictUserIds()));
-		} else {
+		}
+		else {
 			roleService.updateById(roleViewMapper.fromRequest(request));
 			evictCache(request.getId());
 		}
@@ -119,7 +122,6 @@ public class SystemServiceImpl implements SystemService {
 
 	/**
 	 * 角色信息变化时，清除对应的 cache 缓存
-	 * 
 	 * @param roleId
 	 */
 	private void evictCache(String roleId) {
@@ -219,4 +221,5 @@ public class SystemServiceImpl implements SystemService {
 			}
 		}
 	}
+
 }

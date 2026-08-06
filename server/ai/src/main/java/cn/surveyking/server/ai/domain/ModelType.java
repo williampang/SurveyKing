@@ -13,18 +13,20 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ModelType {
-    /**
-     * 模型显示名称
-     */
-    private String displayName;
-    
-    /**
-     * 模型实际值
-     */
-    private String value;
-    
-    /**
-     * 模型描述
-     */
-    private String description;
+
+	/**
+	 * 模型显示名称
+	 */
+	private String displayName;
+
+	/**
+	 * 模型实际值
+	 */
+	private String value;
+
+	/**
+	 * 模型描述
+	 */
+	private String description;
+
 }

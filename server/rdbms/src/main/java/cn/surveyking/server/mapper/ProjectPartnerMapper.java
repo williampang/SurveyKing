@@ -11,7 +11,7 @@ import java.util.List;
  */
 public interface ProjectPartnerMapper extends BaseMapper<ProjectPartner> {
 
-	@Select("select distinct project_id from t_project_partner where user_id = #{userId}")
+	@Select("select distinct project_id from t_project_partner where user_id = #{userId} and type in (1, 2)")
 	List<String> getProjectPerms(String userId);
 
 }

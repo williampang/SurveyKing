@@ -11,6 +11,7 @@ import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -30,9 +31,14 @@ public class JwtTokenUtil {
 	// 每次重启，所有客户端的 token 将失效
 	private final String jwtSecret = generateSecurityKey();
 
+	@Value("${sk.security.jwt.expiration-seconds:28800}")
+	private long jwtExpirationSeconds;
+
 	public String generateAccessToken(UserTokenView user) {
 		return Jwts.builder().serializeToJsonWith(new JacksonSerializer(objectMapper)).claim("user", user)
-				.setIssuedAt(new Date()).signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes())).compact();
+				.setIssuedAt(new Date())
+				.setExpiration(new Date(System.currentTimeMillis() + jwtExpirationSeconds * 1000))
+				.signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes())).compact();
 	}
 
 	public boolean validate(String token) {

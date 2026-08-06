@@ -10,6 +10,11 @@ repositories {
 	mavenCentral()
 }
 
+// 根项目不包含启动类，不生成可执行 Spring Boot 包
+bootJar {
+    enabled = false
+}
+
 allprojects {
     group = 'cn.surveyking'
     version = 'v1.12.0'
@@ -20,6 +25,12 @@ subprojects {
     apply plugin: 'org.springframework.boot'
     apply plugin: 'io.spring.dependency-management'
     apply plugin: 'io.spring.javaformat'
+    // 只有 api 模块负责生成可执行包，其余模块作为普通依赖 jar
+    if (name != 'api') {
+        bootJar {
+            enabled = false
+        }
+    }
     ext{
 
     }

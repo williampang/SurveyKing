@@ -27,11 +27,15 @@ public interface AnswerService {
 
 	AnswerView getAnswer(AnswerQuery query);
 
+	AnswerView getAnswerWithPermission(AnswerQuery query);
+
 	long count(AnswerQuery query);
 
 	AnswerView saveAnswer(AnswerRequest answer);
 
 	AnswerView updateAnswer(AnswerRequest answer);
+
+	AnswerView updateAnswerWithPermission(AnswerRequest answer);
 
 	void deleteAnswer(AnswerRequest request);
 
@@ -85,4 +89,5 @@ public interface AnswerService {
 	AnswerUploadView upload(AnswerUploadRequest request);
 
 	PaginationResponse<ExerciseView> historyExercise(HistoryExerciseQuery query);
+
 }

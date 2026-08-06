@@ -18,10 +18,8 @@ public interface SystemService {
 	@Cacheable(value = CacheConsts.commonCacheName, key = "'systemInfo'")
 	SystemInfo getSystemInfo();
 
-	@Caching(evict = {
-			@CacheEvict(value = CacheConsts.commonCacheName, key = "'systemInfo'"),
-			@CacheEvict(value = CacheConsts.commonCacheName, key = "'aiInfo'")
-	})
+	@Caching(evict = { @CacheEvict(value = CacheConsts.commonCacheName, key = "'systemInfo'"),
+			@CacheEvict(value = CacheConsts.commonCacheName, key = "'aiInfo'") })
 	void updateSystemInfo(SystemInfoRequest request);
 
 	PaginationResponse<RoleView> getRoles(RoleQuery query);
@@ -38,4 +36,5 @@ public interface SystemService {
 
 	@Cacheable(value = CacheConsts.commonCacheName, key = "'aiInfo'")
 	SystemInfo.AiSetting getSystemAiSetting();
+
 }

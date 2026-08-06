@@ -47,7 +47,6 @@ public class SystemApi {
 
 	/**
 	 * 获取系统AI设置
-	 * 
 	 * @return
 	 */
 	@GetMapping("/aiSetting")
@@ -62,7 +61,6 @@ public class SystemApi {
 
 	/**
 	 * 更新系统信息
-	 * 
 	 * @param request 更新请求
 	 */
 	@PostMapping("/update")
@@ -73,7 +71,6 @@ public class SystemApi {
 
 	/**
 	 * 获取系统角色列表
-	 * 
 	 * @param query 角色查询请求
 	 * @return
 	 */
@@ -85,7 +82,6 @@ public class SystemApi {
 
 	/**
 	 * 添加系统角色
-	 * 
 	 * @param request 角色信息
 	 */
 	@PostMapping("/role/create")
@@ -96,7 +92,6 @@ public class SystemApi {
 
 	/**
 	 * 更新系统角色
-	 * 
 	 * @param request 角色信息
 	 */
 	@PostMapping("/role/update")
@@ -107,7 +102,6 @@ public class SystemApi {
 
 	/**
 	 * 删除系统角色
-	 * 
 	 * @param request 角色信息
 	 */
 	@PostMapping("/role/delete")
@@ -119,18 +113,18 @@ public class SystemApi {
 		Long totalRoleObj = systemService.getRoles(new RoleQuery()).getTotal();
 		long totalRoles = totalRoleObj == null ? 0 : totalRoleObj;
 		if (totalRoles <= 1) {
-			throw new ValidationException(messageSource.getMessage("system.role.delete.retainOne", null,
-					LocaleContextHolder.getLocale()));
+			throw new ValidationException(
+					messageSource.getMessage("system.role.delete.retainOne", null, LocaleContextHolder.getLocale()));
 		}
 		systemService.deleteRole(request);
 	}
 
 	/**
 	 * 获取系统权限列表
-	 * 
 	 * @return 权限列表
 	 */
 	@RequestMapping("/permission/list")
+	@PreAuthorize("hasAuthority('system:role:list')")
 	public List<PermissionView> permissions() {
 		return systemService.getPermissions();
 	}
@@ -146,7 +140,6 @@ public class SystemApi {
 
 	/**
 	 * 系统用户列表
-	 * 
 	 * @param query 查询用户信息
 	 * @return
 	 */
@@ -158,7 +151,6 @@ public class SystemApi {
 
 	/**
 	 * 创建系统用户
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/user/create")
@@ -169,7 +161,6 @@ public class SystemApi {
 
 	/**
 	 * 更新系统用户
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/user/update")
@@ -180,7 +171,6 @@ public class SystemApi {
 
 	/**
 	 * 更新用户岗位信息
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/user/updatePosition")
@@ -191,7 +181,6 @@ public class SystemApi {
 
 	/**
 	 * 删除用户
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/user/delete")
@@ -200,28 +189,27 @@ public class SystemApi {
 		if (request.getId() == null) {
 			return;
 		}
-		List<String> userIds = Arrays.stream(request.getId().split(",")).map(String::trim)
-				.filter(id -> !id.isEmpty()).distinct().collect(Collectors.toList());
+		List<String> userIds = Arrays.stream(request.getId().split(",")).map(String::trim).filter(id -> !id.isEmpty())
+				.distinct().collect(Collectors.toList());
 		if (userIds.isEmpty()) {
 			return;
 		}
 		String currentUserId = SecurityContextUtils.getUserId();
 		if (userIds.contains(currentUserId)) {
-			throw new ValidationException(messageSource.getMessage("system.user.delete.self", null,
-					LocaleContextHolder.getLocale()));
+			throw new ValidationException(
+					messageSource.getMessage("system.user.delete.self", null, LocaleContextHolder.getLocale()));
 		}
 		Long total = userService.getUsers(new UserQuery()).getTotal();
 		long totalUsers = total == null ? 0 : total;
 		if (totalUsers - userIds.size() < 1) {
-			throw new ValidationException(messageSource.getMessage("system.user.delete.retainOne", null,
-					LocaleContextHolder.getLocale()));
+			throw new ValidationException(
+					messageSource.getMessage("system.user.delete.retainOne", null, LocaleContextHolder.getLocale()));
 		}
 		userIds.forEach(userService::deleteUser);
 	}
 
 	/**
 	 * 检查登录名是否存在
-	 * 
 	 * @param username 登录用户名
 	 * @return
 	 */
@@ -232,7 +220,6 @@ public class SystemApi {
 
 	/**
 	 * 查询岗位列表
-	 * 
 	 * @param query
 	 * @return
 	 */
@@ -244,7 +231,6 @@ public class SystemApi {
 
 	/**
 	 * 添加岗位
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/position/create")
@@ -255,7 +241,6 @@ public class SystemApi {
 
 	/**
 	 * 更新岗位信息
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/position/update")
@@ -266,7 +251,6 @@ public class SystemApi {
 
 	/**
 	 * 删除岗位信息
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/position/delete")
@@ -277,7 +261,6 @@ public class SystemApi {
 
 	/**
 	 * 获取部门列表
-	 * 
 	 * @return
 	 */
 	@GetMapping("/dept/list")
@@ -306,8 +289,8 @@ public class SystemApi {
 		}
 		List<DeptView> depts = deptService.listDept(null);
 		if (depts == null || depts.size() <= 1) {
-			throw new ValidationException(messageSource.getMessage("system.dept.delete.retainOne", null,
-					LocaleContextHolder.getLocale()));
+			throw new ValidationException(
+					messageSource.getMessage("system.dept.delete.retainOne", null, LocaleContextHolder.getLocale()));
 		}
 		deptService.deleteDept(request.getId());
 	}
@@ -320,7 +303,6 @@ public class SystemApi {
 
 	/**
 	 * 获取字典项列表
-	 * 
 	 * @param query 字典项分页参数
 	 * @return
 	 */
@@ -332,7 +314,6 @@ public class SystemApi {
 
 	/**
 	 * 创建字典项
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/dict/create")
@@ -343,7 +324,6 @@ public class SystemApi {
 
 	/**
 	 * 更新字典项
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/dict/update")
@@ -354,7 +334,6 @@ public class SystemApi {
 
 	/**
 	 * 删除字典项
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/dict/delete")
@@ -365,7 +344,6 @@ public class SystemApi {
 
 	/**
 	 * 获取字典条目列表
-	 * 
 	 * @param query
 	 * @return
 	 */
@@ -377,7 +355,6 @@ public class SystemApi {
 
 	/**
 	 * 添加或者修改字典条目
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/dictItem/create")
@@ -388,7 +365,6 @@ public class SystemApi {
 
 	/**
 	 * 添加或者修改字典条目
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/dictItem/update")
@@ -399,7 +375,6 @@ public class SystemApi {
 
 	/**
 	 * 导入字典条目
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/dictItem/import")
@@ -410,7 +385,6 @@ public class SystemApi {
 
 	/**
 	 * 删除字典条目
-	 * 
 	 * @param request
 	 */
 	@PostMapping("/dictItem/delete")

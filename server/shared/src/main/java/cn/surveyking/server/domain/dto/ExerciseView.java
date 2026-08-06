@@ -12,27 +12,28 @@ import java.util.Date;
 @Data
 public class ExerciseView {
 
-    private String id;
+	private String id;
 
-    private String projectId;
+	private String projectId;
 
-    private String projectName;
+	private String projectName;
 
-    /**
-     * 0：暂存，1：已完成
-     */
-    private Integer tempSave;
+	/**
+	 * 0：暂存，1：已完成
+	 */
+	private Integer tempSave;
 
-    /**
-     * 答题进度
-     */
-    private Long percent;
+	/**
+	 * 答题进度
+	 */
+	private Long percent;
 
-    private Date createAt;
+	private Date createAt;
 
-    private ExamExerciseTypeEnum examExerciseType;
+	private ExamExerciseTypeEnum examExerciseType;
 
-    private String repoId;
+	private String repoId;
 
-    private String answerId;
+	private String answerId;
+
 }

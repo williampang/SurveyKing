@@ -39,13 +39,12 @@ public class RepoPartnerServiceImpl extends BaseService<RepoPartnerMapper, RepoP
 	@Override
 	public PaginationResponse<RepoPartnerView> listRepoPartner(RepoPartnerQuery query) {
 		assertManagePermission(query.getRepoId());
-		Page<RepoPartner> page = pageByQuery(query,
-				Wrappers.<RepoPartner>lambdaQuery()
-						.eq(RepoPartner::getRepoId, query.getRepoId())
-						.apply(StringUtils.hasText(query.getUserName()),
-								"EXISTS (SELECT 1 FROM t_user WHERE t_user.id = t_repo_partner.user_id AND t_user.name = {0})",
-								query.getUserName())
-						.orderByAsc(RepoPartner::getCreateAt));
+		Page<RepoPartner> page = pageByQuery(query, Wrappers.<RepoPartner>lambdaQuery()
+				.eq(RepoPartner::getRepoId, query.getRepoId())
+				.apply(StringUtils.hasText(query.getUserName()),
+						"EXISTS (SELECT 1 FROM t_user WHERE t_user.id = t_repo_partner.user_id AND t_user.name = {0})",
+						query.getUserName())
+				.orderByAsc(RepoPartner::getCreateAt));
 		PaginationResponse<RepoPartnerView> result = new PaginationResponse<>(page.getTotal(),
 				repoPartnerViewMapper.toView(page.getRecords()));
 		result.getList().forEach(view -> {
@@ -63,10 +62,9 @@ public class RepoPartnerServiceImpl extends BaseService<RepoPartnerMapper, RepoP
 			return;
 		}
 		List<RepoPartner> existPartners = list(Wrappers.<RepoPartner>lambdaQuery()
-				.eq(RepoPartner::getRepoId, request.getRepoId())
-				.in(RepoPartner::getUserId, request.getUserIds()));
-		List<RepoPartner> partners = request.getUserIds().stream()
-				.filter(userId -> existPartners.stream().noneMatch(partner -> Objects.equals(partner.getUserId(), userId)))
+				.eq(RepoPartner::getRepoId, request.getRepoId()).in(RepoPartner::getUserId, request.getUserIds()));
+		List<RepoPartner> partners = request.getUserIds().stream().filter(
+				userId -> existPartners.stream().noneMatch(partner -> Objects.equals(partner.getUserId(), userId)))
 				.map(userId -> {
 					RepoPartner partner = new RepoPartner();
 					partner.setRepoId(request.getRepoId());
@@ -81,8 +79,7 @@ public class RepoPartnerServiceImpl extends BaseService<RepoPartnerMapper, RepoP
 	@Override
 	public void deleteRepoPartner(RepoPartnerRequest request) {
 		assertManagePermission(request.getRepoId());
-		remove(Wrappers.<RepoPartner>lambdaUpdate()
-				.eq(RepoPartner::getRepoId, request.getRepoId())
+		remove(Wrappers.<RepoPartner>lambdaUpdate().eq(RepoPartner::getRepoId, request.getRepoId())
 				.in(CollectionUtils.isNotEmpty(request.getIds()), RepoPartner::getId, request.getIds())
 				.in(CollectionUtils.isNotEmpty(request.getUserIds()), RepoPartner::getUserId, request.getUserIds()));
 	}
@@ -99,9 +96,8 @@ public class RepoPartnerServiceImpl extends BaseService<RepoPartnerMapper, RepoP
 		if (Objects.equals(repo.getCreateBy(), userId)) {
 			return true;
 		}
-		return count(Wrappers.<RepoPartner>lambdaQuery()
-				.eq(RepoPartner::getRepoId, repoId)
-				.eq(RepoPartner::getUserId, userId)) > 0;
+		return count(Wrappers.<RepoPartner>lambdaQuery().eq(RepoPartner::getRepoId, repoId).eq(RepoPartner::getUserId,
+				userId)) > 0;
 	}
 
 	private void assertManagePermission(String repoId) {
@@ -110,4 +106,5 @@ public class RepoPartnerServiceImpl extends BaseService<RepoPartnerMapper, RepoP
 			throw new AccessDeniedException("无权限管理该题库成员");
 		}
 	}
+
 }

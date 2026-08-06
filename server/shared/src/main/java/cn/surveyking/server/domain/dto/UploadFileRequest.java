@@ -28,4 +28,5 @@ public class UploadFileRequest {
 
 	@JsonIgnore
 	public Boolean publicUpload;
+
 }

@@ -17,18 +17,17 @@ import javax.validation.Valid;
 @RequiredArgsConstructor
 public class ExerciseApi {
 
-    private final AnswerService answerService;
+	private final AnswerService answerService;
 
-    /**
-     * 历史练习列表。
-     *
-     * @param query 查询参数。
-     * @return 当前答案。
-     */
-    @GetMapping("/list")
-    @PreAuthorize("hasAuthority('exercise:list')")
-    public PaginationResponse<ExerciseView> historyExercise(@Valid HistoryExerciseQuery query) {
-        return answerService.historyExercise(query);
-    }
+	/**
+	 * 历史练习列表。
+	 * @param query 查询参数。
+	 * @return 当前答案。
+	 */
+	@GetMapping("/list")
+	@PreAuthorize("hasAuthority('exercise:list')")
+	public PaginationResponse<ExerciseView> historyExercise(@Valid HistoryExerciseQuery query) {
+		return answerService.historyExercise(query);
+	}
 
 }

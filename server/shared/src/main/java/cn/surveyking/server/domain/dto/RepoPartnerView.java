@@ -10,4 +10,5 @@ public class RepoPartnerView {
 	private UserInfo user;
 
 	private String userId;
+
 }

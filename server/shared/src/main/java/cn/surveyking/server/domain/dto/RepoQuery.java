@@ -24,4 +24,5 @@ public class RepoQuery extends PageQuery {
 	private Boolean isPractice;
 
 	private Boolean memberOnly;
+
 }

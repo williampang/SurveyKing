@@ -10,4 +10,5 @@ public class RepoPartnerQuery extends PageQuery {
 	private String repoId;
 
 	private String userName;
+
 }

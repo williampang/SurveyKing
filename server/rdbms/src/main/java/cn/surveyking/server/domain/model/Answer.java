@@ -28,7 +28,6 @@ public class Answer extends BaseModel {
 
 	private String projectId;
 
-
 	private String repoId;
 
 	/**

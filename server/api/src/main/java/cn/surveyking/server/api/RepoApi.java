@@ -83,22 +83,24 @@ public class RepoApi {
 	}
 
 	@PostMapping("/unbind")
+	@PreAuthorize("hasAuthority('repo:update')")
 	public void batchUnBindTemplate(@RequestBody RepoTemplateRequest request) {
 		repoService.batchUnBindTemplate(request);
 	}
 
 	/**
 	 * 从题库里面挑选试题
-	 * 
 	 * @param repos
 	 * @return
 	 */
 	@PostMapping("/pick")
+	@PreAuthorize("hasAuthority('repo:detail')")
 	public List<SurveySchema> pickQuestionFromRepo(@RequestBody List<ProjectSetting.RandomSurveyCondition> repos) {
 		return repoService.pickQuestionFromRepo(repos);
 	}
 
 	@PostMapping("/import")
+	@PreAuthorize("hasAuthority('repo:update')")
 	public void importFromTemplate(RepoTemplateRequest request) {
 		try {
 			repoService.importFromTemplate(request);
@@ -113,7 +115,6 @@ public class RepoApi {
 
 	/**
 	 * 我的笔记
-	 * 
 	 * @param query
 	 * @return
 	 */
@@ -137,7 +138,6 @@ public class RepoApi {
 
 	/**
 	 * 我的笔记
-	 * 
 	 * @param request
 	 * @return
 	 */
@@ -149,11 +149,10 @@ public class RepoApi {
 
 	/**
 	 * 导出题库题目
-	 * 
 	 * @param request
 	 */
 	@GetMapping("/export")
-	// @PreAuthorize("hasAuthority('repo:export')")
+	@PreAuthorize("hasAuthority('repo:detail')")
 	public void exportRepoQuestions(RepoRequest request) {
 		repoService.exportRepoQuestions(request);
 	}
