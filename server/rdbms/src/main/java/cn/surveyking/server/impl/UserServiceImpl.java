@@ -2,6 +2,7 @@ package cn.surveyking.server.impl;
 
 import cn.surveyking.server.core.common.PaginationResponse;
 import cn.surveyking.server.core.constant.AppConsts;
+import cn.surveyking.server.core.constant.CacheConsts;
 import cn.surveyking.server.core.constant.ErrorCode;
 import cn.surveyking.server.core.constant.ProjectModeEnum;
 import cn.surveyking.server.core.constant.ProjectPartnerTypeEnum;
@@ -9,6 +10,7 @@ import cn.surveyking.server.core.exception.ErrorCodeException;
 import cn.surveyking.server.core.exception.InternalServerError;
 import cn.surveyking.server.core.security.PasswordEncoder;
 import cn.surveyking.server.core.uitls.ContextHelper;
+import cn.surveyking.server.core.uitls.ExcelImportSecurity;
 import cn.surveyking.server.core.uitls.PinyinUtils;
 import cn.surveyking.server.core.uitls.SecurityContextUtils;
 import cn.surveyking.server.domain.dto.*;
@@ -32,6 +34,8 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.dhatim.fastexcel.reader.ReadableWorkbook;
 import org.dhatim.fastexcel.reader.Row;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.MessageSource;
@@ -42,6 +46,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
@@ -49,6 +55,7 @@ import javax.validation.ValidationException;
 import java.io.InputStream;
 import java.util.*;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -65,6 +72,11 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 @RequiredArgsConstructor
 @Slf4j
 public class UserServiceImpl extends BaseService<UserMapper, User> implements UserService {
+
+	private static final String ROOT_DEPT_PARENT_ID = "0";
+
+	private static final Pattern STRONG_PASSWORD_PATTERN = Pattern
+			.compile("^(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])[a-zA-Z0-9]{8,16}$");
 
 	private final AccountMapper accountMapper;
 
@@ -92,6 +104,8 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 
 	private final CaptchaService captchaService;
 
+	private final CacheManager cacheManager;
+
 	/**
 	 * @param username 账号密码登录认证使用
 	 * @return
@@ -99,8 +113,8 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 	 */
 	@Override
 	public UserInfo loadUserByUsername(String username) throws UsernameNotFoundException {
-		LambdaQueryWrapper<Account> queryWrapper = Wrappers.<Account>lambdaQuery().eq(Account::getAuthAccount,
-				username);
+		LambdaQueryWrapper<Account> queryWrapper = Wrappers.<Account>lambdaQuery()
+				.eq(Account::getAuthType, AppConsts.AUTH_TYPE.PWD.name()).eq(Account::getAuthAccount, username);
 		Account existAccount = accountMapper.selectOne(queryWrapper);
 		if (existAccount == null) {
 			throw new UsernameNotFoundException(i18n("user.service.notFound", username));
@@ -122,13 +136,15 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 		UserInfo userInfo = userViewMapper.toUserInfo(user);
 		List<Role> roles = userRoleMapper
 				.selectList(Wrappers.<UserRole>lambdaQuery().eq(UserRole::getUserId, user.getId())).stream()
-				.map(ur -> roleService.getById(ur.getRoleId())).filter(x -> x != null).collect(Collectors.toList());
+				.map(ur -> roleService.getById(ur.getRoleId()))
+				.filter(role -> role != null && Objects.equals(role.getStatus(), AppConsts.USER_STATUS.VALID))
+				.collect(Collectors.toList());
 		Set<String> authorities = new HashSet<>();
 		roles.forEach(role -> {
 			authorities.add("ROLE_" + role.getCode());
-			Arrays.stream(role.getAuthority().split(",")).forEach(authority -> {
-				authorities.add(authority);
-			});
+			if (isNotBlank(role.getAuthority())) {
+				Arrays.stream(role.getAuthority().split(",")).filter(StringUtils::hasText).forEach(authorities::add);
+			}
 		});
 		userInfo.setAuthorities(
 				authorities.stream().map(authority -> (GrantedAuthority) () -> authority).collect(Collectors.toSet()));
@@ -158,8 +174,8 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 								Arrays.asList(query.getIds() != null ? query.getIds() : new String[0])));
 		return new PaginationResponse<>(userPage.getTotal(), userPage.getRecords().stream().map(x -> {
 			UserView userView = userViewMapper.toView(x);
-			Account account = accountMapper
-					.selectOne(Wrappers.<Account>lambdaQuery().eq(Account::getUserId, x.getId()));
+			Account account = accountMapper.selectOne(Wrappers.<Account>lambdaQuery().eq(Account::getUserId, x.getId())
+					.eq(Account::getAuthType, AppConsts.AUTH_TYPE.PWD.name()));
 			userView.setUsername(account.getAuthAccount());
 			userView.setStatus(account.getStatus());
 			// 设置用户部门
@@ -212,6 +228,13 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 		addUserPositions(request);
 	}
 
+	@Override
+	public void createSystemUser(UserRequest request) {
+		validateStrongPassword(request.getPassword(), null);
+		assertGrantableRoles(request.getRoles());
+		createUser(request);
+	}
+
 	private void addUserRoles(UserRequest request) {
 		if (!CollectionUtils.isEmpty(request.getRoles())) {
 			request.getRoles().forEach(roleId -> {
@@ -240,13 +263,22 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 		if (request.getId() == null) {
 			return;
 		}
+		assertManageableUser(request.getId());
+		assertGrantableRoles(request.getRoles());
+		if (isNotBlank(request.getPassword())) {
+			validateStrongPassword(request.getPassword(), null);
+		}
 		User user = userViewMapper.fromRequest(request);
 		this.updateById(user);
 
 		if (request.getStatus() != null || isNotBlank(request.getPassword())) {
 			// 更新登录账号
-			Account account = accountMapper
-					.selectOne(Wrappers.<Account>lambdaQuery().eq(Account::getUserId, request.getId()));
+			Account account = accountMapper.selectOne(Wrappers.<Account>lambdaQuery()
+					.eq(Account::getUserId, request.getId()).eq(Account::getAuthType, AppConsts.AUTH_TYPE.PWD.name()));
+			if (isNotBlank(request.getPassword()) && Objects.equals(request.getId(), SecurityContextUtils.getUserId())
+					&& !SecurityContextUtils.isAdmin() && isBlank(request.getOldPassword())) {
+				throw new InternalServerError(i18n("user.password.invalid"));
+			}
 			if (isNotBlank(request.getPassword()) && isNotBlank(request.getOldPassword())) {
 				if (!passwordEncoder.matches(request.getOldPassword(), account.getAuthSecret())) {
 					throw new InternalServerError(i18n("user.password.invalid"));
@@ -275,19 +307,56 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 					.delete(Wrappers.<UserPosition>lambdaQuery().eq(UserPosition::getUserId, request.getId()));
 			addUserPositions(request);
 		}
+		evictUserAfterCommit(request.getId());
+	}
+
+	@Override
+	@CacheEvict(cacheNames = "userCache", key = "#userId")
+	public void updateUserProfile(String userId, UserProfileRequest request) {
+		if (userId == null) {
+			throw new AccessDeniedException("未登录用户不能修改个人资料");
+		}
+		User user = new User();
+		user.setId(userId);
+		user.setName(request.getName());
+		user.setAvatar(request.getAvatar());
+		user.setProfile(request.getProfile());
+		user.setPhone(request.getPhone());
+		user.setEmail(request.getEmail());
+		user.setGender(request.getGender());
+		user.setCorrectTimes(request.getCorrectTimes());
+		updateById(user);
+
+		if (isNotBlank(request.getPassword())) {
+			validateStrongPassword(request.getPassword(), null);
+			if (isBlank(request.getOldPassword())) {
+				throw new InternalServerError(i18n("user.password.invalid"));
+			}
+			Account account = accountMapper.selectOne(Wrappers.<Account>lambdaQuery().eq(Account::getUserId, userId)
+					.eq(Account::getAuthType, AppConsts.AUTH_TYPE.PWD.name()));
+			if (account == null || !passwordEncoder.matches(request.getOldPassword(), account.getAuthSecret())) {
+				throw new InternalServerError(i18n("user.password.invalid"));
+			}
+			account.setAuthSecret(passwordEncoder.encode(request.getPassword()));
+			accountMapper.updateById(account);
+		}
+		evictUserAfterCommit(userId);
 	}
 
 	@Override
 	@CacheEvict(cacheNames = "userCache", key = "#id")
 	public void deleteUser(String id) {
+		assertManageableUser(id);
 		removeById(id);
+		accountMapper.physicallyDeleteExternalByUserId(id);
 		accountMapper.delete(Wrappers.<Account>lambdaQuery().eq(Account::getUserId, id));
+		evictUserAfterCommit(id);
 	}
 
 	@Override
 	public boolean checkUsernameExist(String username) {
-		Account account = accountMapper
-				.selectOne(Wrappers.<Account>lambdaQuery().eq(Account::getAuthAccount, username));
+		Account account = accountMapper.selectOne(Wrappers.<Account>lambdaQuery()
+				.eq(Account::getAuthType, AppConsts.AUTH_TYPE.PWD.name()).eq(Account::getAuthAccount, username));
 		if (account != null) {
 			return true;
 		}
@@ -385,9 +454,11 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 		if (registerInfo == null || !Boolean.TRUE.equals(registerInfo.getRegisterEnabled())) {
 			throw new ErrorCodeException(ErrorCode.RegisterError);
 		}
+		validateStrongPassword(request.getPassword(), null);
 
 		long total = accountMapper
-				.selectCount(Wrappers.<Account>lambdaQuery().eq(Account::getAuthAccount, request.getUsername()));
+				.selectCount(Wrappers.<Account>lambdaQuery().eq(Account::getAuthType, AppConsts.AUTH_TYPE.PWD.name())
+						.eq(Account::getAuthAccount, request.getUsername()));
 		if (total > 0) {
 			throw new ErrorCodeException(ErrorCode.UsernameExists);
 		}
@@ -395,6 +466,7 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 		createUserRequest.setUsername(request.getUsername());
 		createUserRequest.setPassword(request.getPassword());
 		createUserRequest.setName(request.getName());
+		createUserRequest.setDeptId(getRootDeptId());
 		createUserRequest.setStatus(AppConsts.USER_STATUS.VALID);
 		String role = request.getRole();
 		if (role != null) {
@@ -407,6 +479,14 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 			createUserRequest.setRoles(registerInfo.getRoles());
 		}
 		createUser(createUserRequest);
+	}
+
+	private String getRootDeptId() {
+		return deptMapper
+				.selectList(Wrappers.<Dept>lambdaQuery().eq(Dept::getParentId, ROOT_DEPT_PARENT_ID)
+						.orderByAsc(Dept::getSortCode).orderByAsc(Dept::getCreateAt))
+				.stream().findFirst().map(Dept::getId)
+				.orElseThrow(() -> new InternalServerError(i18n("user.register.rootDeptNotFound")));
 	}
 
 	@Override
@@ -450,22 +530,29 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 	@Override
 	@SneakyThrows
 	public void importUser(UserRequest request) {
+		if (!SecurityContextUtils.hasAuthority("system:user:create")) {
+			throw new AccessDeniedException("无权限导入用户");
+		}
 		if (request.getFile() == null || request.getFile().isEmpty()) {
 			throw new InternalServerError(i18n("user.import.fileRequired"));
 		}
+		ExcelImportSecurity.validateFile(request.getFile());
+		ExcelImportSecurity.RowGuard rowGuard = ExcelImportSecurity.newRowGuard();
 		Map<String, String> roleName2Id = buildNameIdMap(roleService.list(), Role::getName, Role::getId,
 				"user.import.duplicateRoleName");
 		Map<String, String> deptName2Id = buildNameIdMap(deptMapper.selectList(null), Dept::getName, Dept::getId,
 				"user.import.duplicateDeptName");
 		Set<String> usernameSet = new HashSet<>();
 		Set<String> existingUsernames = accountMapper
-				.selectList(Wrappers.<Account>lambdaQuery().select(Account::getAuthAccount)).stream()
-				.map(Account::getAuthAccount).filter(Objects::nonNull).collect(Collectors.toSet());
+				.selectList(Wrappers.<Account>lambdaQuery().select(Account::getAuthAccount).eq(Account::getAuthType,
+						AppConsts.AUTH_TYPE.PWD.name()))
+				.stream().map(Account::getAuthAccount).filter(Objects::nonNull).collect(Collectors.toSet());
 		try (InputStream is = request.getFile().getInputStream(); ReadableWorkbook wb = new ReadableWorkbook(is)) {
 			wb.getSheets().forEach(sheet -> {
 				int[] rowNum = { 1 };
 				try (Stream<Row> rows = sheet.openStream()) {
 					rows.forEach(r -> {
+						rowGuard.validate(r);
 						if (r.getRowNum() == 1) {
 							return;
 						}
@@ -481,8 +568,10 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 						if (!usernameSet.add(userRequest.getUsername())) {
 							throw new InternalServerError(i18n("user.import.usernameDuplicate", rowNum[0]));
 						}
-						// 默认密码为 123456
-						userRequest.setPassword(getCellValue(r, 2).orElse("123456"));
+						String password = getCellValue(r, 2).orElseThrow(
+								() -> new InternalServerError(i18n("user.import.passwordRequired", rowNum[0])));
+						validateStrongPassword(password, rowNum[0]);
+						userRequest.setPassword(password);
 						userRequest.setStatus(AppConsts.USER_STATUS.VALID);
 						userRequest.setPhone(getCellValue(r, 3).orElse(null));
 						userRequest.setEmail(getCellValue(r, 4).orElse(null));
@@ -509,6 +598,7 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 							}
 							List<String> roleIds = roleNames.stream().map(roleName2Id::get).distinct()
 									.collect(Collectors.toList());
+							assertGrantableRoles(roleIds);
 							userRequest.setRoles(roleIds);
 						}
 						createUser(userRequest);
@@ -524,6 +614,84 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 					throw new InternalServerError(i18n("user.import.parseError", rowNum[0]), e);
 				}
 			});
+		}
+	}
+
+	private void assertManageableUser(String userId) {
+		if (SecurityContextUtils.isAdmin()) {
+			return;
+		}
+		Set<String> callerAuthorities = currentAuthorityNames();
+		if (!callerAuthorities.containsAll(loadAuthorityNames(userId))) {
+			throw new AccessDeniedException("不能管理权限高于当前用户的账号");
+		}
+	}
+
+	private void assertGrantableRoles(List<String> roleIds) {
+		if (roleIds == null) {
+			return;
+		}
+		List<String> normalizedIds = roleIds.stream().filter(StringUtils::hasText).distinct()
+				.collect(Collectors.toList());
+		List<Role> roles = normalizedIds.isEmpty() ? Collections.emptyList() : roleService.listByIds(normalizedIds);
+		if (roles.size() != normalizedIds.size()
+				|| roles.stream().anyMatch(role -> !Objects.equals(role.getStatus(), AppConsts.USER_STATUS.VALID))) {
+			throw new AccessDeniedException("不能分配不存在或已停用的角色");
+		}
+		if (SecurityContextUtils.isAdmin()) {
+			return;
+		}
+		Set<String> callerAuthorities = currentAuthorityNames();
+		for (Role role : roles) {
+			Set<String> roleAuthorities = toAuthorityNames(role);
+			if (roleAuthorities.contains(AppConsts.ROLE_ADMIN) || !callerAuthorities.containsAll(roleAuthorities)) {
+				throw new AccessDeniedException("不能分配权限高于当前用户的角色");
+			}
+		}
+	}
+
+	private Set<String> loadAuthorityNames(String userId) {
+		Set<String> authorities = new HashSet<>();
+		userRoleMapper.selectList(Wrappers.<UserRole>lambdaQuery().eq(UserRole::getUserId, userId)).stream()
+				.map(userRole -> roleService.getById(userRole.getRoleId()))
+				.filter(role -> role != null && Objects.equals(role.getStatus(), AppConsts.USER_STATUS.VALID))
+				.forEach(role -> authorities.addAll(toAuthorityNames(role)));
+		return authorities;
+	}
+
+	private Set<String> currentAuthorityNames() {
+		return SecurityContextUtils.getUser().getAuthorities().stream().map(GrantedAuthority::getAuthority)
+				.collect(Collectors.toSet());
+	}
+
+	private Set<String> toAuthorityNames(Role role) {
+		Set<String> authorities = new HashSet<>();
+		if (StringUtils.hasText(role.getCode())) {
+			authorities.add("ROLE_" + role.getCode());
+		}
+		if (isNotBlank(role.getAuthority())) {
+			Arrays.stream(role.getAuthority().split(",")).filter(StringUtils::hasText).forEach(authorities::add);
+		}
+		return authorities;
+	}
+
+	private void evictUserAfterCommit(String userId) {
+		Cache userCache = cacheManager.getCache(CacheConsts.userCacheName);
+		if (userCache == null || userId == null) {
+			return;
+		}
+		Runnable evict = () -> userCache.evictIfPresent(userId);
+		if (TransactionSynchronizationManager.isActualTransactionActive()
+				&& TransactionSynchronizationManager.isSynchronizationActive()) {
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+				@Override
+				public void afterCommit() {
+					evict.run();
+				}
+			});
+		}
+		else {
+			evict.run();
 		}
 	}
 
@@ -665,6 +833,16 @@ public class UserServiceImpl extends BaseService<UserMapper, User> implements Us
 			return Optional.empty();
 		}
 		return Optional.of(cellValue.trim());
+	}
+
+	private void validateStrongPassword(String password, Integer rowNum) {
+		if (password != null && STRONG_PASSWORD_PATTERN.matcher(password).matches()) {
+			return;
+		}
+		if (rowNum != null) {
+			throw new InternalServerError(i18n("user.import.passwordWeak", rowNum));
+		}
+		throw new InternalServerError(i18n("user.password.strong"));
 	}
 
 	private String i18n(String key, Object... args) {

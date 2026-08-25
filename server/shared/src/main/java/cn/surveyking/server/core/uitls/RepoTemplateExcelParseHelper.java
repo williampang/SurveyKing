@@ -41,12 +41,15 @@ public class RepoTemplateExcelParseHelper {
 
 	@SneakyThrows
 	public List<TemplateRequest> parse() {
+		ExcelImportSecurity.validateFile(templateFile);
+		ExcelImportSecurity.RowGuard rowGuard = ExcelImportSecurity.newRowGuard();
 		try (InputStream is = templateFile.getInputStream(); ReadableWorkbook wb = new ReadableWorkbook(is)) {
 			wb.getSheets().forEach(sheet -> {
 				String sheetName = sheet.getName();
 				int[] currentRowNum = { 1 };
 				try (Stream<Row> rows = sheet.openStream()) {
 					rows.forEach(r -> {
+						rowGuard.validate(r);
 						int rowNum = r.getRowNum();
 						currentRowNum[0] = rowNum;
 						if (rowNum == 1) {

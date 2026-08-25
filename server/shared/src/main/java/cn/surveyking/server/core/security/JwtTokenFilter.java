@@ -6,6 +6,7 @@ import cn.surveyking.server.core.uitls.ContextHelper;
 import cn.surveyking.server.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -22,9 +23,6 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.ArrayList;
-
-import static java.util.Optional.ofNullable;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -65,9 +63,13 @@ public class JwtTokenFilter extends OncePerRequestFilter {
 		try {
 			// Get user identity and set it on the spring security context
 			UserDetails userDetails = userService.loadUserById(jwtTokenUtil.getUser(token).getUserId());
+			if (userDetails == null || !userDetails.isEnabled() || !userDetails.isAccountNonLocked()
+					|| !userDetails.isAccountNonExpired() || !userDetails.isCredentialsNonExpired()) {
+				throw new DisabledException("User account is unavailable");
+			}
 
 			UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails,
-					null, ofNullable(userDetails).map(UserDetails::getAuthorities).orElse(new ArrayList<>()));
+					null, userDetails.getAuthorities());
 			authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
 			SecurityContextHolder.getContext().setAuthentication(authentication);

@@ -19,7 +19,11 @@ public interface UserService extends UserDetailsService {
 
 	void createUser(UserRequest request);
 
+	void createSystemUser(UserRequest request);
+
 	void updateUser(UserRequest request);
+
+	void updateUserProfile(String userId, UserProfileRequest request);
 
 	void deleteUser(String id);
 

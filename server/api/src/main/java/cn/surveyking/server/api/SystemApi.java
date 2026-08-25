@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -52,11 +53,42 @@ public class SystemApi {
 	@GetMapping("/aiSetting")
 	@PreAuthorize("hasRole('admin')")
 	public SystemInfo.AiSetting getSystemAiSetting() {
-		SystemInfo.AiSetting aiSetting = systemService.getSystemAiSetting();
-		if (aiSetting != null) {
-			aiSetting.setToken(null);
+		SystemInfo.AiSetting storedSetting = systemService.getSystemAiSetting();
+		if (storedSetting == null) {
+			return null;
 		}
-		return aiSetting;
+
+		// 不要直接修改持久化对象。MyBatis 可能会复用缓存中的对象，直接脱敏会导致
+		// 后续 AI 调用也无法读取 API Key。
+		SystemInfo.AiSetting response = new SystemInfo.AiSetting();
+		response.setEnabled(storedSetting.getEnabled());
+		response.setBaseUrl(storedSetting.getBaseUrl());
+		response.setModels(storedSetting.getModels());
+		response.setDefaultModel(storedSetting.getDefaultModel());
+		response.setPrompt(storedSetting.getPrompt());
+		if (!StringUtils.hasText(response.getBaseUrl()) && !StringUtils.hasText(storedSetting.getApiKey())
+				&& StringUtils.hasText(storedSetting.getToken())) {
+			response.setBaseUrl("https://api.siliconflow.cn/v1");
+		}
+		return response;
+	}
+
+	/**
+	 * 获取脱敏后的第三方登录配置。
+	 */
+	@GetMapping("/oauthSetting")
+	@PreAuthorize("hasRole('admin')")
+	public OAuthSettingView getOAuthSetting() {
+		return systemService.getOAuthSettingView();
+	}
+
+	/**
+	 * 更新第三方登录配置。
+	 */
+	@PostMapping("/oauthSetting")
+	@PreAuthorize("hasRole('admin')")
+	public void updateOAuthSetting(@RequestBody OAuthSettingRequest request) {
+		systemService.updateOAuthSetting(request);
 	}
 
 	/**
@@ -156,7 +188,7 @@ public class SystemApi {
 	@PostMapping("/user/create")
 	@PreAuthorize("hasAuthority('system:user:create')")
 	public void createUser(@RequestBody @Valid UserRequest request) {
-		userService.createUser(request);
+		userService.createSystemUser(request);
 	}
 
 	/**

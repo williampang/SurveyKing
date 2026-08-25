@@ -85,6 +85,11 @@ public class ProjectSetting {
 		private Boolean wechatOnly;
 
 		/**
+		 * 通过微信公众号网页授权记录填写者的 OpenID、昵称和头像。
+		 */
+		private Boolean wechatUserInfo;
+
+		/**
 		 * ip 答题限制
 		 */
 		private UniqueLimitSetting ipLimit;

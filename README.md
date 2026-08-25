@@ -51,7 +51,7 @@
 
 1. 下载卷王快速体验安装包(加群)
 2. 解压，双击运行 start.bat
-3. 打开浏览器访问 [http://localhost:1991](http://localhost:1991)，输入账号密码： _admin_/_123456_
+3. 打开浏览器访问 [http://localhost:1991](http://localhost:1991)，默认账号密码为 `admin`/`123456`。首次登录后请立即修改为 8-16 位且包含大写字母、小写字母和数字的强密码。
 
 ### EazyDevelop一键部署
 

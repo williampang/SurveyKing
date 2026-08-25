@@ -62,6 +62,22 @@ public enum ErrorCode {
 	 * 文件解析失败
 	 */
 	FileParseError(4042, "文件解析失败"),
+	/**
+	 * 文件大小超出限制
+	 */
+	FileSizeExceeded(4043, "文件大小超出限制"),
+	/**
+	 * 文件上传过于频繁
+	 */
+	FileUploadRateExceeded(4044, "文件上传过于频繁，请稍后再试"),
+	/**
+	 * 项目附件存储空间不足
+	 */
+	FileStorageQuotaExceeded(4045, "项目附件存储空间不足"),
+	/**
+	 * 文件引用与当前问卷不匹配
+	 */
+	FileReferenceInvalid(4046, "文件引用无效"),
 
 	/**
 	 * 未配置关联条件

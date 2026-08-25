@@ -103,7 +103,7 @@ public class SurveyApi {
 		headers.add(HttpHeaders.CACHE_CONTROL, CacheControl.maxAge(Duration.ofDays(30)).getHeaderValue());
 		query.setDispositionType(AppConsts.DispositionTypeEnum.inline);
 		query.setHeaders(headers);
-		return fileService.loadFile(query);
+		return fileService.loadPublicFile(query);
 	}
 
 	/**

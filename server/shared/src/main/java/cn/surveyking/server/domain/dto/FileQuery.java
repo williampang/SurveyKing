@@ -24,6 +24,10 @@ public class FileQuery {
 
 	List<String> ids;
 
+	String projectId;
+
+	String questionId;
+
 	/**
 	 * 文件id
 	 */

@@ -19,7 +19,7 @@ SurveyKing is one of the known open source survey systems that has **the most po
 1. First [install Java runtime environment](https://www.java.com/en/download/manual.jsp) (if the machine already has a Java environment, you can ignore it)
 2. Download [Volume King Installation Package](https://github.com/javahuang/SurveyKing/releases/download/v0.2.0/surveyking-h2-v0.2.0.jar)
 3. Double-click to run
-4. Open the browser to visit <http://localhost:1991>, enter the account password: *admin*/*surveyking*
+4. Open <http://localhost:1991> and sign in with the default account `admin` and password `123456`. Change it immediately to an 8-16 character password containing uppercase letters, lowercase letters, and digits.
 
 ## Features
 
@@ -85,7 +85,7 @@ Windows and mac support double-click to run, or open a command line window to ex
 java -jar surveyking-v0.1.0.jar
 ```
 
-Open the browser and visit <http://localhost:1991>. After the system is started for the first time, the admin user, account/password (*admin/surveyking*) will be created automatically, and the password can be changed through the user management interface after logging in to the system.
+Open the browser and visit <http://localhost:1991>. Sign in with the default account `admin` and password `123456`, then immediately change it to an 8-16 character password containing uppercase letters, lowercase letters, and digits.
 
 ### h2 startup method
 

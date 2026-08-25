@@ -50,6 +50,8 @@ public class SystemInfo {
 
 	private Boolean aiEnabled;
 
+	private OAuthProviderAvailability oauthProviders;
+
 	@Data
 	public static class RegisterInfo {
 
@@ -105,8 +107,21 @@ public class SystemInfo {
 
 		private Boolean enabled;
 
+		/**
+		 * OpenAI-compatible API base URL, for example https://api.openai.com/v1.
+		 */
+		private String baseUrl;
+
 		private List<String> models;
 
+		private String defaultModel;
+
+		private String apiKey;
+
+		/**
+		 * Legacy SiliconFlow token. Kept for backward compatibility with existing
+		 * configuration records.
+		 */
 		private String token;
 
 		private String prompt;

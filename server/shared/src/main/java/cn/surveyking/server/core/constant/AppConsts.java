@@ -108,7 +108,7 @@ public class AppConsts {
 
 	public enum AUTH_TYPE {
 
-		PWD
+		PWD, GOOGLE, WECHAT
 
 	}
 

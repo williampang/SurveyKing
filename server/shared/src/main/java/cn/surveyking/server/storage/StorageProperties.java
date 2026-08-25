@@ -24,6 +24,24 @@ public class StorageProperties {
 
 	public final ThumbImage thumbImage = new ThumbImage();
 
+	/** 公开问卷单文件默认最大体积，单位 MB */
+	private long maxPublicFileSizeMb = 20;
+
+	/** 单个客户端每分钟最多上传文件数 */
+	private int maxPublicUploadsPerMinute = 10;
+
+	/** 单个项目每分钟最多上传文件数 */
+	private int maxPublicUploadsPerProjectPerMinute = 60;
+
+	/** 单个项目附件存储上限，单位 MB */
+	private long maxProjectStorageMb = 1024;
+
+	/** 所有公开问卷附件的总存储上限，单位 MB */
+	private long maxTotalPublicStorageMb = 5120;
+
+	/** 允许生成缩略图的最大像素数 */
+	private long maxImagePixels = 16000000L;
+
 	@Data
 	public class ThumbImage {
 

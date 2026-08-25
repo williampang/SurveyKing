@@ -33,4 +33,8 @@ public class FileView {
 	 */
 	private String content;
 
+	/** 仅供服务端执行字段级附件权限过滤 */
+	@JsonIgnore
+	private String questionId;
+
 }

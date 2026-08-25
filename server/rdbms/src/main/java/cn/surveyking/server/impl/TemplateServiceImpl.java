@@ -7,10 +7,13 @@ import cn.surveyking.server.core.uitls.SecurityContextUtils;
 import cn.surveyking.server.domain.dto.*;
 import cn.surveyking.server.domain.mapper.TemplateViewMapper;
 import cn.surveyking.server.domain.model.Repo;
+import cn.surveyking.server.domain.model.RepoPartner;
 import cn.surveyking.server.domain.model.Tag;
 import cn.surveyking.server.domain.model.Template;
 import cn.surveyking.server.domain.model.UserBook;
 import cn.surveyking.server.mapper.TemplateMapper;
+import cn.surveyking.server.mapper.RepoMapper;
+import cn.surveyking.server.mapper.RepoPartnerMapper;
 import cn.surveyking.server.service.BaseService;
 import cn.surveyking.server.service.TemplateService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -18,6 +21,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +44,10 @@ public class TemplateServiceImpl extends BaseService<TemplateMapper, Template> i
 
 	private final TemplateViewMapper templateViewMapper;
 
+	private final RepoMapper repoMapper;
+
+	private final RepoPartnerMapper repoPartnerMapper;
+
 	@Resource
 	@Lazy
 	private UserBookServiceImpl userBookService;
@@ -50,6 +58,9 @@ public class TemplateServiceImpl extends BaseService<TemplateMapper, Template> i
 
 	@Override
 	public PaginationResponse<TemplateView> listTemplate(TemplateQuery query) {
+		if (query.getRepoId() != null) {
+			assertReadableRepo(query.getRepoId());
+		}
 		List<String> taggedTemplateIds = getTaggedTemplateIds(query.getTag());
 		if (!query.getTag().isEmpty() && taggedTemplateIds.isEmpty()) {
 			return new PaginationResponse<>(0L, Collections.emptyList());
@@ -75,6 +86,9 @@ public class TemplateServiceImpl extends BaseService<TemplateMapper, Template> i
 
 	@Override
 	public String addTemplate(TemplateRequest request) {
+		if (request.getRepoId() != null) {
+			assertManageRepo(request.getRepoId());
+		}
 		Template template = templateViewMapper.fromRequest(request);
 		save(template);
 		return template.getId();
@@ -82,22 +96,35 @@ public class TemplateServiceImpl extends BaseService<TemplateMapper, Template> i
 
 	@Override
 	public void batchAddTemplate(List<TemplateRequest> templateRequests) {
+		templateRequests.stream().map(TemplateRequest::getRepoId).filter(Objects::nonNull).distinct()
+				.forEach(this::assertManageRepo);
 		saveBatch(templateViewMapper.fromRequest(templateRequests));
 	}
 
 	@Override
 	public void batchUpdateTemplate(List<TemplateRequest> templateRequests) {
+		templateRequests.forEach(request -> assertTemplateUpdateAllowed(getById(request.getId()), request));
 		updateBatchById(templateViewMapper.fromRequest(templateRequests));
 	}
 
 	@Override
 	public void updateTemplate(TemplateRequest request) {
+		assertTemplateUpdateAllowed(getById(request.getId()), request);
 		updateById(templateViewMapper.fromRequest(request));
 	}
 
 	@Override
 	public void deleteTemplate(TemplateRequest request) {
-		removeBatchByIds(request.getIds());
+		List<String> templateIds = request.getIds() == null ? Collections.emptyList() : request.getIds().stream()
+				.filter(hasTextId -> hasText(hasTextId)).distinct().collect(Collectors.toList());
+		List<Template> templates = templateIds.isEmpty() ? Collections.emptyList() : listByIds(templateIds);
+		if (templates.size() != templateIds.size()) {
+			throw new AccessDeniedException("模板不存在或无权删除");
+		}
+		templates.forEach(this::assertManageTemplate);
+		if (!templateIds.isEmpty()) {
+			removeBatchByIds(templateIds);
+		}
 	}
 
 	@Override
@@ -146,14 +173,16 @@ public class TemplateServiceImpl extends BaseService<TemplateMapper, Template> i
 		SurveySchema schema = template.getTemplate();
 		schema.setId(query.getId());
 
-		UserBook userBook = userBookService
-				.getOne(Wrappers.<UserBook>lambdaQuery().eq(UserBook::getTemplateId, query.getId())
-						.eq(UserBook::getCreateBy, SecurityContextUtils.getUserId()));
-		if (userBook != null) {
-			templateView.setNote(userBook.getNote());
-			templateView.setCorrectTimes(userBook.getCorrectTimes());
-			templateView.setWrongTimes(userBook.getWrongTimes());
-		}
+		List<UserBook> userBooks = userBookService.list(Wrappers.<UserBook>lambdaQuery()
+				.eq(UserBook::getTemplateId, query.getId()).eq(UserBook::getCreateBy, SecurityContextUtils.getUserId())
+				.orderByDesc(UserBook::getUpdateAt).orderByDesc(UserBook::getCreateAt));
+		userBooks.stream().filter(x -> hasText(x.getNote())).findFirst()
+				.ifPresent(x -> templateView.setNote(x.getNote()));
+		userBooks.stream().filter(x -> Objects.equals(x.getType(), UserBookServiceImpl.BOOK_TYPE_WRONG)).findFirst()
+				.ifPresent(x -> {
+					templateView.setCorrectTimes(x.getCorrectTimes());
+					templateView.setWrongTimes(x.getWrongTimes());
+				});
 		return templateView;
 	}
 
@@ -162,10 +191,59 @@ public class TemplateServiceImpl extends BaseService<TemplateMapper, Template> i
 			throw new ValidationException("模板不存在");
 		}
 		if (Objects.equals(template.getShared(), 1)
-				|| Objects.equals(template.getCreateBy(), SecurityContextUtils.getUserId())) {
+				|| Objects.equals(template.getCreateBy(), SecurityContextUtils.getUserId())
+				|| (template.getRepoId() != null && isReadableRepo(template.getRepoId()))) {
 			return;
 		}
 		throw new ValidationException("没有权限访问该模板");
+	}
+
+	Template getReadableTemplate(String templateId) {
+		Template template = getById(templateId);
+		assertReadableTemplate(template);
+		return template;
+	}
+
+	private void assertManageTemplate(Template template) {
+		if (template == null) {
+			throw new AccessDeniedException("模板不存在或无权修改");
+		}
+		if (Objects.equals(template.getCreateBy(), SecurityContextUtils.getUserId())) {
+			return;
+		}
+		if (template.getRepoId() != null) {
+			assertManageRepo(template.getRepoId());
+			return;
+		}
+		throw new AccessDeniedException("模板不存在或无权修改");
+	}
+
+	private void assertTemplateUpdateAllowed(Template template, TemplateRequest request) {
+		assertManageTemplate(template);
+		if (request.getRepoId() != null && !Objects.equals(request.getRepoId(), template.getRepoId())) {
+			assertManageRepo(request.getRepoId());
+		}
+	}
+
+	private void assertManageRepo(String repoId) {
+		Repo repo = repoMapper.selectById(repoId);
+		if (repo == null || !Objects.equals(repo.getCreateBy(), SecurityContextUtils.getUserId())) {
+			throw new AccessDeniedException("无权管理该题库的模板");
+		}
+	}
+
+	private void assertReadableRepo(String repoId) {
+		if (!isReadableRepo(repoId)) {
+			throw new AccessDeniedException("无权访问该题库的模板");
+		}
+	}
+
+	private boolean isReadableRepo(String repoId) {
+		Repo repo = repoMapper.selectById(repoId);
+		return repo != null && (Objects.equals(repo.getCreateBy(), SecurityContextUtils.getUserId())
+				|| Boolean.TRUE.equals(repo.getShared())
+				|| repoPartnerMapper.selectCount(Wrappers.<RepoPartner>lambdaQuery().eq(RepoPartner::getRepoId, repoId)
+						.eq(RepoPartner::getUserId, SecurityContextUtils.getUserId())) > 0);
 	}
 
 	private List<String> getTaggedTemplateIds(List<String> tags) {

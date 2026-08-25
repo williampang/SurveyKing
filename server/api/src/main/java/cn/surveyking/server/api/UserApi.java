@@ -1,10 +1,10 @@
 package cn.surveyking.server.api;
 
 import cn.surveyking.server.core.common.PaginationResponse;
-import cn.surveyking.server.core.constant.AppConsts;
 import cn.surveyking.server.core.constant.ErrorCode;
 import cn.surveyking.server.core.exception.ErrorCodeException;
-import cn.surveyking.server.core.security.JwtTokenUtil;
+import cn.surveyking.server.core.security.LoginAttemptLimiter;
+import cn.surveyking.server.core.security.AuthenticationCookieService;
 import cn.surveyking.server.core.uitls.RSAUtils;
 import cn.surveyking.server.core.uitls.SecurityContextUtils;
 import cn.surveyking.server.domain.dto.*;
@@ -16,7 +16,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -43,33 +42,38 @@ public class UserApi {
 
 	private final AuthenticationManager authenticationManager;
 
-	private final JwtTokenUtil jwtTokenUtil;
+	private final AuthenticationCookieService authenticationCookieService;
+
+	private final LoginAttemptLimiter loginAttemptLimiter;
 
 	@PostMapping("/public/login")
 	public ResponseEntity login(@RequestBody @Valid AuthRequest request, HttpServletRequest httpRequest) {
+		userService.validateCaptcha(request);
+		String clientAddress = httpRequest.getRemoteAddr();
+		if (!loginAttemptLimiter.isAllowed(request.getUsername(), clientAddress)) {
+			throw new ErrorCodeException(ErrorCode.UsernameOrPasswordError);
+		}
 		Authentication authentication;
 		try {
 			String decryptPwd = RSAUtils.decrypt(request.getPassword());
 			authentication = new UsernamePasswordAuthenticationToken(request.getUsername(), decryptPwd);
 			Authentication authenticate = authenticationManager.authenticate(authentication);
 			UserInfo user = (UserInfo) authenticate.getPrincipal();
-			HttpCookie cookie = ResponseCookie
-					.from(AppConsts.TOKEN_NAME, jwtTokenUtil.generateAccessToken(new UserTokenView(user.getUserId())))
-					.path("/").httpOnly(true).secure(httpRequest.isSecure()).sameSite("Lax").build();
+			loginAttemptLimiter.recordSuccess(request.getUsername(), clientAddress);
+			String token = authenticationCookieService.createToken(user.getUserId());
+			HttpCookie cookie = authenticationCookieService.createCookie(token, httpRequest);
 			return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
-					.header(HttpHeaders.AUTHORIZATION,
-							jwtTokenUtil.generateAccessToken(new UserTokenView(user.getUserId())))
-					.build();
+					.header(HttpHeaders.AUTHORIZATION, token).build();
 		}
 		catch (Exception e) {
+			loginAttemptLimiter.recordFailure(request.getUsername(), clientAddress);
 			throw new ErrorCodeException(ErrorCode.UsernameOrPasswordError);
 		}
 	}
 
 	@PostMapping("/public/logout")
 	public ResponseEntity logout(HttpServletRequest httpRequest) {
-		HttpCookie cookie = ResponseCookie.from(AppConsts.TOKEN_NAME, "").path("/").httpOnly(true)
-				.secure(httpRequest.isSecure()).sameSite("Lax").maxAge(0).build();
+		HttpCookie cookie = authenticationCookieService.clearCookie(httpRequest);
 		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).build();
 	}
 
@@ -92,10 +96,9 @@ public class UserApi {
 
 	@PostMapping("/user")
 	@PreAuthorize("hasAuthority('user:update')")
-	public UserInfo updateUser(@RequestBody UserRequest request) {
-		// 只有本人才能通过调用这个接口修改个人信息
-		request.setId(SecurityContextUtils.getUserId());
-		userService.updateUser(request);
+	public UserInfo updateUser(@RequestBody UserProfileRequest request) {
+		String userId = SecurityContextUtils.getUserId();
+		userService.updateUserProfile(userId, request);
 		return userService.loadUserById(SecurityContextUtils.getUserId());
 	}
 
@@ -109,7 +112,7 @@ public class UserApi {
 	 * @param request
 	 */
 	@PostMapping("/importUser")
-	@PreAuthorize("hasAuthority('home')")
+	@PreAuthorize("hasAuthority('system:user:create')")
 	public void importUser(UserRequest request) {
 		userService.importUser(request);
 	}

@@ -2,6 +2,7 @@ package cn.surveyking.server.impl;
 
 import cn.surveyking.server.core.common.PaginationResponse;
 import cn.surveyking.server.core.exception.InternalServerError;
+import cn.surveyking.server.core.uitls.ExcelImportSecurity;
 import cn.surveyking.server.core.uitls.SecurityContextUtils;
 import cn.surveyking.server.domain.dto.*;
 import cn.surveyking.server.domain.mapper.CommDictItemViewMapper;
@@ -93,11 +94,14 @@ public class DictServiceImpl extends BaseService<CommDictMapper, CommDict> imple
 	@Override
 	@SneakyThrows
 	public void importDictItem(CommDictItemRequest request) {
+		ExcelImportSecurity.validateFile(request.getFile());
+		ExcelImportSecurity.RowGuard rowGuard = ExcelImportSecurity.newRowGuard();
 		try (InputStream is = request.getFile().getInputStream(); ReadableWorkbook wb = new ReadableWorkbook(is)) {
 			wb.getSheets().forEach(sheet -> {
 				try (Stream<Row> rows = sheet.openStream()) {
 					List<CommDictItem> itemList = new ArrayList<>();
 					rows.forEach(r -> {
+						rowGuard.validate(r);
 						if (r.getRowNum() == 1) {
 							return;
 						}

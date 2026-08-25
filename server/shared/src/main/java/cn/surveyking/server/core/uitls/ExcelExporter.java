@@ -120,20 +120,23 @@ public class ExcelExporter {
 			else {
 				excelExporter = new ExcelExporter();
 			}
-			// 如果答案中不存在 openid，则删除该列
-			int openidColumnIndex = this.columns.indexOf(SchemaHelper.getOpenIdColumnName());
-			if (!Boolean.TRUE.equals(SchemaHelper.localOpenId.get()) && openidColumnIndex != -1) {
-				this.columns.remove(openidColumnIndex);
-				this.rows.forEach(row -> {
-					row.remove(openidColumnIndex);
-				});
-				SchemaHelper.localOpenId.remove();
-			}
+			removeEmptyColumn(SchemaHelper.getOpenIdColumnName(), SchemaHelper.localOpenId);
+			removeEmptyColumn(SchemaHelper.getWechatNicknameColumnName(), SchemaHelper.localWechatNickname);
+			removeEmptyColumn(SchemaHelper.getWechatAvatarColumnName(), SchemaHelper.localWechatAvatar);
 			excelExporter.createSheet(this.sheetName);
 			excelExporter.createRow(this.rows);
 			excelExporter.createHeader(this.columns);
 
 			return excelExporter;
+		}
+
+		private void removeEmptyColumn(String columnName, ThreadLocal<Boolean> present) {
+			int columnIndex = this.columns.indexOf(columnName);
+			if (!Boolean.TRUE.equals(present.get()) && columnIndex != -1) {
+				this.columns.remove(columnIndex);
+				this.rows.forEach(row -> row.remove(columnIndex));
+			}
+			present.remove();
 		}
 
 	}

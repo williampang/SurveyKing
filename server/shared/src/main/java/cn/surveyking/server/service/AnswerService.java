@@ -90,4 +90,6 @@ public interface AnswerService {
 
 	PaginationResponse<ExerciseView> historyExercise(HistoryExerciseQuery query);
 
+	void deleteExercise(AnswerRequest request);
+
 }

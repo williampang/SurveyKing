@@ -34,7 +34,14 @@ public interface SystemService {
 
 	void extractCodeDiffDbPermissions();
 
-	@Cacheable(value = CacheConsts.commonCacheName, key = "'aiInfo'")
+	@Cacheable(value = CacheConsts.commonCacheName, key = "'aiInfo'", unless = "#result == null")
 	SystemInfo.AiSetting getSystemAiSetting();
+
+	OAuthSetting getSystemOAuthSetting();
+
+	OAuthSettingView getOAuthSettingView();
+
+	@CacheEvict(value = CacheConsts.commonCacheName, allEntries = true)
+	void updateOAuthSetting(OAuthSettingRequest request);
 
 }

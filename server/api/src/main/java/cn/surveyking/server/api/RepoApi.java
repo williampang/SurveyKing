@@ -3,6 +3,7 @@ package cn.surveyking.server.api;
 import cn.surveyking.server.core.common.PaginationResponse;
 import cn.surveyking.server.core.exception.ErrorCodeException;
 import cn.surveyking.server.core.exception.InternalServerError;
+import cn.surveyking.server.core.uitls.SecurityContextUtils;
 import cn.surveyking.server.domain.dto.*;
 import cn.surveyking.server.service.RepoPartnerService;
 import cn.surveyking.server.service.RepoService;
@@ -10,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.util.List;
 
 /**
@@ -30,8 +32,12 @@ public class RepoApi {
 	 * @return
 	 */
 	@GetMapping("/list")
-	@PreAuthorize("hasAuthority('repo:list')")
+	@PreAuthorize("hasAnyAuthority('repo:list', 'exercise:list')")
 	public PaginationResponse<RepoView> listRepo(RepoQuery query) {
+		if (!SecurityContextUtils.hasAuthority("repo:list")) {
+			query.setIsPractice(true);
+			query.setMemberOnly(true);
+		}
 		return repoService.listRepo(query);
 	}
 
@@ -42,13 +48,13 @@ public class RepoApi {
 
 	@PostMapping("/create")
 	@PreAuthorize("hasAuthority('repo:create')")
-	public void addRepo(@RequestBody RepoRequest request) {
+	public void addRepo(@RequestBody @Valid RepoRequest request) {
 		repoService.addRepo(request);
 	}
 
 	@PostMapping("/update")
 	@PreAuthorize("hasAuthority('repo:update')")
-	public void updateRepo(@RequestBody RepoRequest request) {
+	public void updateRepo(@RequestBody @Valid RepoRequest request) {
 		repoService.updateRepo(request);
 	}
 
@@ -122,6 +128,12 @@ public class RepoApi {
 	@PreAuthorize("hasAuthority('repo:book')")
 	public PaginationResponse<UserBookView> listUserBook(UserBookQuery query) {
 		return repoService.listUserBook(query);
+	}
+
+	@GetMapping("/book/question")
+	@PreAuthorize("hasAuthority('repo:book')")
+	public SurveySchema getUserBookQuestion(@RequestParam String id) {
+		return repoService.getUserBookQuestion(id);
 	}
 
 	@PostMapping("/book/create")

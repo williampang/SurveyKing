@@ -43,6 +43,9 @@ public class PublicProjectView {
 
 	private Boolean isAuthenticated;
 
+	/** 已配置微信公众号登录，但当前浏览器还没有完成本问卷的微信授权。 */
+	private Boolean wechatAuthorizationRequired;
+
 	private AnswerExamInfo examInfo;
 
 }

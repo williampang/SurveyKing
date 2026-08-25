@@ -186,9 +186,7 @@ public class ProjectServiceImpl extends BaseService<ProjectMapper, Project> impl
 		List<String> ids = assertProjectIdsPermitted(request.getIds());
 		getBaseMapper().batchDestroy(ids);
 		// 删除项目参与者
-		ProjectPartnerRequest deletePartnerRequest = new ProjectPartnerRequest();
-		deletePartnerRequest.setProjectIds(ids);
-		projectPartnerService.deleteProjectPartner(deletePartnerRequest);
+		projectPartnerService.deleteAllProjectPartners(ids);
 	}
 
 	@Override

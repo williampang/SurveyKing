@@ -27,6 +27,10 @@ public interface ProjectPartnerService {
 			key = "T(cn.surveyking.server.core.uitls.SecurityContextUtils).getUserId()")
 	void deleteProjectPartner(ProjectPartnerRequest request);
 
+	void deleteAllProjectPartners(List<String> projectIds);
+
+	void assertProjectOwner(String projectId);
+
 	@Cacheable(cacheNames = CacheConsts.projectPermissionCacheName,
 			key = "T(cn.surveyking.server.core.uitls.SecurityContextUtils).getUserId()")
 	List<String> getProjectPerms();

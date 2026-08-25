@@ -1,5 +1,6 @@
 package cn.surveyking.server.api;
 
+import cn.surveyking.server.core.annotation.EnableDataPerm;
 import cn.surveyking.server.domain.dto.ReportData;
 import cn.surveyking.server.service.ReportService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class ReportApi {
 
 	@GetMapping("/{shortId}")
 	@PreAuthorize("hasAuthority('project:report')")
+	@EnableDataPerm(key = "#shortId")
 	public ReportData getData(@PathVariable String shortId) {
 		return reportService.getData(shortId);
 	}

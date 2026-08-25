@@ -36,7 +36,7 @@ public class WebConfig implements WebMvcConfigurer {
 	private Resource indexHtml;
 
 	// 匹配类型的静态资源都会被 ResourceHandler 来处理
-	public static final String[] STATIC_RESOURCES = { "/**/*.css", "/**/*.js", "/**/*.jpg", "/**/*.png", "/**/*.svg", // 图片
+	public static final String[] STATIC_RESOURCES = { "/**/*.css", "/**/*.js", "/**/*.jpg", "/**/*.png", "/**/*.svg", "/**/*.webp", // 图片
 			"/**/*.eot", "/**/*.ttf", "/**/*.woff", "/**/favicon.ico" };
 
 	@Override

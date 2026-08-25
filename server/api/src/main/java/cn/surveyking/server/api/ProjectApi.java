@@ -129,6 +129,7 @@ public class ProjectApi {
 	@PreAuthorize("hasAuthority('project:update')")
 	@EnableDataPerm(key = "#request.projectId")
 	public void addProjectPartner(@RequestBody ProjectPartnerRequest request) {
+		projectPartnerService.assertProjectOwner(request.getProjectId());
 		projectPartnerService.addProjectPartner(request);
 	}
 
@@ -140,6 +141,7 @@ public class ProjectApi {
 	@PreAuthorize("hasAuthority('project:update')")
 	@EnableDataPerm(key = "#request.projectId")
 	public void deleteProjectPartner(@RequestBody ProjectPartnerRequest request) {
+		projectPartnerService.assertProjectOwner(request.getProjectId());
 		projectPartnerService.deleteProjectPartner(request);
 	}
 

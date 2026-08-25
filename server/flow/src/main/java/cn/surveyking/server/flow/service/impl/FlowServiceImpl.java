@@ -436,7 +436,9 @@ public class FlowServiceImpl implements FlowService {
 			view.setFieldPermission(node.getFieldPermission());
 			filterAnswerByPermission(answerView.getAnswer(), node.getFieldPermission());
 			view.setAnswer(answerView.getAnswer());
-			view.setAttachment(answerView.getAttachment());
+			view.setAttachment(answerView.getAttachment().stream()
+					.filter(file -> isFieldReadable(file.getQuestionId(), node.getFieldPermission()))
+					.collect(Collectors.toList()));
 			view.setUsers(answerView.getUsers());
 			view.setDepts(answerView.getDepts());
 		}
@@ -478,15 +480,17 @@ public class FlowServiceImpl implements FlowService {
 	private void filterAnswerByPermission(LinkedHashMap<String, Object> answer,
 			LinkedHashMap<String, Integer> fieldPermission) {
 		answer.entrySet().removeIf(entry -> {
-			Integer valuePermission = fieldPermission.get(entry.getKey());
-			if (valuePermission == null) {
-				return false;
-			}
-			if (valuePermission == 0) {
-				return true;
-			}
-			return false;
+			Integer permission = fieldPermission == null ? null : fieldPermission.get(entry.getKey());
+			return permission != null && permission == FieldPermissionType.hidden;
 		});
+	}
+
+	private boolean isFieldReadable(String fieldId, LinkedHashMap<String, Integer> fieldPermission) {
+		if (fieldId == null) {
+			return false;
+		}
+		Integer valuePermission = fieldPermission == null ? null : fieldPermission.get(fieldId);
+		return valuePermission == null || valuePermission != FieldPermissionType.hidden;
 	}
 
 }

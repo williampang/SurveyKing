@@ -1,5 +1,6 @@
 package cn.surveyking.server.domain.model;
 
+import cn.surveyking.server.domain.dto.OAuthSetting;
 import cn.surveyking.server.domain.dto.SystemInfo;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -79,6 +80,13 @@ public class SysInfo implements Serializable {
 	 */
 	@TableField(typeHandler = JacksonTypeHandler.class, jdbcType = JdbcType.VARCHAR)
 	private SystemInfo.AiSetting aiSetting;
+
+	/**
+	 * Third-party login settings. This value contains secrets and must only be accessed
+	 * through a masked admin view or internal service methods.
+	 */
+	@TableField(typeHandler = JacksonTypeHandler.class, jdbcType = JdbcType.VARCHAR)
+	private OAuthSetting oauthSetting;
 
 	/**
 	 * 创建时间

@@ -79,8 +79,9 @@ public class ChatController {
 	@GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
 	public Flux<StreamResponseEvent> createChatStream(@RequestParam(value = "content", required = false) String content,
 			@RequestParam(value = "model", required = false) String model,
-			@RequestParam(value = "conversation_id", required = false) String conversationId) {
-		return createChatStreamInternal(content, model, conversationId, null, true);
+			@RequestParam(value = "conversation_id", required = false) String conversationId,
+			@RequestParam(value = "locale", required = false) String locale) {
+		return createChatStreamInternal(content, model, conversationId, null, locale, true);
 	}
 
 	@GetMapping(value = "/answer-analysis/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -91,7 +92,7 @@ public class ChatController {
 		if (!StringUtils.hasText(content)) {
 			return Flux.just(new StreamResponseEvent(EventTypeEnum.error, "题目内容不能为空"));
 		}
-		return createChatStreamInternal(content, model, conversationId, ANSWER_ANALYSIS_SYSTEM_PROMPT, false);
+		return createChatStreamInternal(content, model, conversationId, ANSWER_ANALYSIS_SYSTEM_PROMPT, null, false);
 	}
 
 	private ConversationResponse createConversationInternal(ConversationRequest conversationRequest, String model) {
@@ -101,8 +102,9 @@ public class ChatController {
 	}
 
 	private Flux<StreamResponseEvent> createChatStreamInternal(String content, String model, String conversationId,
-			String systemPrompt, boolean allowDefaultContent) {
-		ChatRequest chatRequest = buildChatRequest(content, model, conversationId, systemPrompt, allowDefaultContent);
+			String systemPrompt, String locale, boolean allowDefaultContent) {
+		ChatRequest chatRequest = buildChatRequest(content, model, conversationId, systemPrompt, locale,
+				allowDefaultContent);
 		return chatService.createChatStream(chatRequest, conversationId, model).doOnNext(event -> {
 			if (event.getEventType().name().equals("done") && conversationId != null) {
 				// 预留扩展：如有需要可在这里缓存 AI 响应
@@ -111,11 +113,12 @@ public class ChatController {
 	}
 
 	private ChatRequest buildChatRequest(String content, String model, String conversationId, String systemPrompt,
-			boolean allowDefaultContent) {
+			String locale, boolean allowDefaultContent) {
 		ChatRequest chatRequest = new ChatRequest();
 		chatRequest.setConversationId(conversationId);
 		chatRequest.setModel(model);
 		chatRequest.setSystemPrompt(systemPrompt);
+		chatRequest.setLocale(locale);
 
 		String trimmedContent = StringUtils.hasText(content) ? content.trim() : null;
 		if (trimmedContent != null && conversationId != null) {

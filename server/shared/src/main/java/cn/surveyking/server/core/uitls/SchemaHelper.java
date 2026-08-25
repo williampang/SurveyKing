@@ -30,8 +30,16 @@ public class SchemaHelper {
 
 	protected static ThreadLocal<Boolean> localOpenId = new ThreadLocal<>();
 
+	protected static ThreadLocal<Boolean> localWechatNickname = new ThreadLocal<>();
+
+	protected static ThreadLocal<Boolean> localWechatAvatar = new ThreadLocal<>();
+
 	// 常量定义
 	public static final String OPENID_COLUMN_NAME = "自定义字段";
+
+	public static final String WECHAT_NICKNAME_COLUMN_NAME = "微信昵称";
+
+	public static final String WECHAT_AVATAR_COLUMN_NAME = "微信头像";
 
 	public static final String DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
@@ -70,6 +78,14 @@ public class SchemaHelper {
 		return i18n("schema.column.customField", OPENID_COLUMN_NAME);
 	}
 
+	public static String getWechatNicknameColumnName() {
+		return i18n("schema.column.wechatNickname", WECHAT_NICKNAME_COLUMN_NAME);
+	}
+
+	public static String getWechatAvatarColumnName() {
+		return i18n("schema.column.wechatAvatar", WECHAT_AVATAR_COLUMN_NAME);
+	}
+
 	private static String i18n(String code, String defaultMessage, Object... args) {
 		Locale locale = LocaleContextHolder.getLocale();
 		if (locale == null) {
@@ -97,11 +113,11 @@ public class SchemaHelper {
 		}
 
 		// 添加固定的元数据列
-		result.addAll(Arrays.asList(getOpenIdColumnName(), i18n("schema.column.submitter", "提交人"),
-				i18n("schema.column.submitTime", "提交时间"), i18n("schema.column.duration", "填写时长"),
-				i18n("schema.column.device", "填写设备"), i18n("schema.column.os", "操作系统"),
-				i18n("schema.column.browser", "浏览器"), i18n("schema.column.region", "填写地区"),
-				i18n("schema.column.ip", "IP"), i18n("schema.column.id", "ID")));
+		result.addAll(Arrays.asList(getOpenIdColumnName(), getWechatNicknameColumnName(), getWechatAvatarColumnName(),
+				i18n("schema.column.submitter", "提交人"), i18n("schema.column.submitTime", "提交时间"),
+				i18n("schema.column.duration", "填写时长"), i18n("schema.column.device", "填写设备"),
+				i18n("schema.column.os", "操作系统"), i18n("schema.column.browser", "浏览器"),
+				i18n("schema.column.region", "填写地区"), i18n("schema.column.ip", "IP"), i18n("schema.column.id", "ID")));
 
 		return result;
 	}
@@ -440,6 +456,20 @@ public class SchemaHelper {
 		if (answer.containsKey("openid")) {
 			rowData.add(answer.get("openid"));
 			localOpenId.set(true);
+		}
+		else {
+			rowData.add("");
+		}
+		if (answer.containsKey("wechatNickname")) {
+			rowData.add(answer.get("wechatNickname"));
+			localWechatNickname.set(true);
+		}
+		else {
+			rowData.add("");
+		}
+		if (answer.containsKey("wechatAvatarUrl")) {
+			rowData.add(answer.get("wechatAvatarUrl"));
+			localWechatAvatar.set(true);
 		}
 		else {
 			rowData.add("");

@@ -27,30 +27,34 @@ import java.util.function.Consumer;
 public class ChatServiceImpl implements ChatService {
 
 	@Autowired
-	private SiliconflowChatServiceImpl siliconflowChatService;
+	private OpenAiCompatibleChatServiceImpl openAiCompatibleChatService;
 
 	@Override
 	public List<ModelType> getAllModelTypes() {
 		// 检查AI是否启用
-		if (!siliconflowChatService.isEnabled()) {
+		if (!openAiCompatibleChatService.isEnabled()) {
 			log.warn("AI功能未启用，返回空模型列表");
 			return Collections.emptyList();
 		}
 
-		// 返回 SiliconFlow 支持的模型
-		return siliconflowChatService.getSupportedModels();
+		return openAiCompatibleChatService.getSupportedModels();
 	}
 
 	@Override
 	public ConversationResponse createConversation(ConversationRequest conversationRequest, String model) {
 		// 检查AI是否启用
-		if (!siliconflowChatService.isEnabled()) {
+		if (!openAiCompatibleChatService.isEnabled()) {
 			log.warn("AI功能未启用，无法创建对话");
 			throw new IllegalStateException("AI功能未启用");
 		}
 
-		// 使用 SiliconFlow 服务创建对话
-		return siliconflowChatService.createConversation(conversationRequest);
+		if (conversationRequest == null) {
+			conversationRequest = new ConversationRequest();
+		}
+		if (org.springframework.util.StringUtils.hasText(model)) {
+			conversationRequest.setModel(model);
+		}
+		return openAiCompatibleChatService.createConversation(conversationRequest);
 	}
 
 	@Override
@@ -61,7 +65,7 @@ public class ChatServiceImpl implements ChatService {
 			log.debug("Received AI message: {}", message.getContent());
 		};
 
-		return siliconflowChatService.createChatStream(chatRequest, conversationId, model, emptyConsumer);
+		return openAiCompatibleChatService.createChatStream(chatRequest, conversationId, model, emptyConsumer);
 	}
 
 }

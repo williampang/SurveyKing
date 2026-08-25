@@ -26,6 +26,11 @@ public class UploadFileRequest {
 
 	private String questionId;
 
+	/**
+	 * 是否允许通过公开预览接口访问。仅对已认证的后台上传生效。
+	 */
+	private Boolean publicRead;
+
 	@JsonIgnore
 	public Boolean publicUpload;
 

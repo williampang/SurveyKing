@@ -9,7 +9,6 @@ import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 
 /**
  * @author javahuang
@@ -43,7 +42,7 @@ public class LocalStorageService extends AbstractStorageService {
 
 		try (InputStream inputStream = file) {
 			Files.createDirectories(destinationFile.getParent());
-			Files.copy(inputStream, destinationFile, StandardCopyOption.REPLACE_EXISTING);
+			Files.copy(inputStream, destinationFile);
 		}
 		catch (IOException e) {
 			e.printStackTrace();
@@ -53,6 +52,9 @@ public class LocalStorageService extends AbstractStorageService {
 
 	private Path resolvePath(String path) {
 		Path normalizedPath = Paths.get(path).normalize();
+		if (normalizedPath.isAbsolute() || normalizedPath.startsWith("..")) {
+			throw new ErrorCodeException(ErrorCode.FileUploadError);
+		}
 		Path destinationPath = this.rootLocation.resolve(normalizedPath).toAbsolutePath().normalize();
 
 		// Ensure the destination path is within the root location
@@ -64,25 +66,25 @@ public class LocalStorageService extends AbstractStorageService {
 	}
 
 	@Override
-	public byte[] download(String filePath) {
-		Path resolvedPath = resolvePath(filePath);
-
-		try {
-			return Files.readAllBytes(resolvedPath);
-		}
-		catch (IOException e) {
-			e.printStackTrace();
-			throw new ErrorCodeException(ErrorCode.FileNotExists);
-		}
-	}
-
-	@Override
 	public InputStream downloadAsStream(String filePath) {
 		try {
 			return Files.newInputStream(resolvePath(filePath));
 		}
 		catch (IOException e) {
 			throw new ErrorCodeException(ErrorCode.FileNotExists);
+		}
+	}
+
+	@Override
+	public void deleteFile(String filePath) {
+		if (filePath == null) {
+			return;
+		}
+		try {
+			Files.deleteIfExists(resolvePath(filePath));
+		}
+		catch (IOException e) {
+			throw new ErrorCodeException(ErrorCode.FileUploadError);
 		}
 	}
 

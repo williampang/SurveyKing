@@ -6,6 +6,7 @@ import cn.surveyking.server.core.constant.CacheConsts;
 import cn.surveyking.server.core.constant.ProjectPartnerTypeEnum;
 import cn.surveyking.server.core.exception.InternalServerError;
 import cn.surveyking.server.core.uitls.ContextHelper;
+import cn.surveyking.server.core.uitls.ExcelImportSecurity;
 import cn.surveyking.server.core.uitls.ExcelExporter;
 import cn.surveyking.server.core.uitls.SecurityContextUtils;
 import cn.surveyking.server.domain.dto.ProjectPartnerQuery;
@@ -27,15 +28,22 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import org.dhatim.fastexcel.reader.ReadableWorkbook;
 import org.dhatim.fastexcel.reader.Row;
+import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -84,6 +92,11 @@ public class ProjectPartnerServiceImpl extends BaseService<ProjectPartnerMapper,
 
 	@Override
 	public void addProjectPartner(ProjectPartnerRequest request) {
+		if (ProjectPartnerTypeEnum.OWNER.getType() == request.getType()
+				&& count(Wrappers.<ProjectPartner>lambdaQuery().eq(ProjectPartner::getProjectId, request.getProjectId())
+						.eq(ProjectPartner::getType, ProjectPartnerTypeEnum.OWNER.getType())) > 0) {
+			throw new AccessDeniedException("请使用专用的所有权转移功能");
+		}
 		// 添加答题人
 		List<ProjectPartner> existUserIds = list(Wrappers.<ProjectPartner>lambdaQuery()
 				.in(request.getUserIds() != null, ProjectPartner::getUserId, request.getUserIds())
@@ -107,13 +120,9 @@ public class ProjectPartnerServiceImpl extends BaseService<ProjectPartnerMapper,
 			}).collect(Collectors.toList()));
 		}
 		else {
-			saveBatch(request.getUserIds().stream().filter(userId -> {
+			List<ProjectPartner> newPartners = request.getUserIds().stream().filter(userId -> {
 				if (existUserIds.stream().anyMatch(partner -> partner.getUserId().equals(userId))) {
 					return false;
-				}
-				if (ProjectPartnerTypeEnum.OWNER.getType() == request.getType()
-						|| ProjectPartnerTypeEnum.COLLABORATOR.getType() == request.getType()) {
-					cacheManager.getCache(CacheConsts.projectPermissionCacheName).evict(userId);
 				}
 				return true;
 			}).map(userId -> {
@@ -122,17 +131,78 @@ public class ProjectPartnerServiceImpl extends BaseService<ProjectPartnerMapper,
 				partner.setUserId(userId);
 				partner.setType(request.getType());
 				return partner;
-			}).collect(Collectors.toList()));
+			}).collect(Collectors.toList());
+			saveBatch(newPartners);
+			evictProjectPermissions(newPartners);
 		}
 	}
 
 	@Override
 	public void deleteProjectPartner(ProjectPartnerRequest request) {
-		remove(Wrappers.<ProjectPartner>lambdaUpdate()
+		if (CollectionUtils.isEmpty(request.getIds()) && CollectionUtils.isEmpty(request.getProjectIds())
+				&& request.getProjectId() == null) {
+			throw new AccessDeniedException("未指定要删除的项目成员");
+		}
+		List<ProjectPartner> partners = list(Wrappers.<ProjectPartner>lambdaQuery()
 				.in(CollectionUtils.isNotEmpty(request.getIds()), ProjectPartner::getId, request.getIds())
 				.in(CollectionUtils.isNotEmpty(request.getProjectIds()), ProjectPartner::getProjectId,
 						request.getProjectIds())
 				.eq(request.getProjectId() != null, ProjectPartner::getProjectId, request.getProjectId()));
+		if (partners.stream()
+				.anyMatch(partner -> Objects.equals(partner.getType(), ProjectPartnerTypeEnum.OWNER.getType()))) {
+			throw new AccessDeniedException("不能通过成员删除接口删除项目所有者");
+		}
+		if (!partners.isEmpty()) {
+			removeByIds(partners.stream().map(ProjectPartner::getId).collect(Collectors.toList()));
+		}
+		evictProjectPermissions(partners);
+	}
+
+	@Override
+	public void deleteAllProjectPartners(List<String> projectIds) {
+		if (CollectionUtils.isEmpty(projectIds)) {
+			return;
+		}
+		List<ProjectPartner> partners = list(
+				Wrappers.<ProjectPartner>lambdaQuery().in(ProjectPartner::getProjectId, projectIds));
+		if (!partners.isEmpty()) {
+			removeByIds(partners.stream().map(ProjectPartner::getId).collect(Collectors.toList()));
+		}
+		evictProjectPermissions(partners);
+	}
+
+	@Override
+	public void assertProjectOwner(String projectId) {
+		if (projectId == null
+				|| count(Wrappers.<ProjectPartner>lambdaQuery().eq(ProjectPartner::getProjectId, projectId)
+						.eq(ProjectPartner::getUserId, SecurityContextUtils.getUserId())
+						.eq(ProjectPartner::getType, ProjectPartnerTypeEnum.OWNER.getType())) == 0) {
+			throw new AccessDeniedException("只有项目所有者可以管理成员");
+		}
+	}
+
+	private void evictProjectPermissions(Collection<ProjectPartner> partners) {
+		Cache permissionCache = cacheManager.getCache(CacheConsts.projectPermissionCacheName);
+		if (permissionCache == null || partners == null) {
+			return;
+		}
+		Set<String> affectedUserIds = partners.stream()
+				.filter(partner -> Objects.equals(partner.getType(), ProjectPartnerTypeEnum.OWNER.getType())
+						|| Objects.equals(partner.getType(), ProjectPartnerTypeEnum.COLLABORATOR.getType()))
+				.map(ProjectPartner::getUserId).filter(Objects::nonNull).collect(Collectors.toSet());
+		Runnable evict = () -> affectedUserIds.forEach(permissionCache::evictIfPresent);
+		if (TransactionSynchronizationManager.isActualTransactionActive()
+				&& TransactionSynchronizationManager.isSynchronizationActive()) {
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+				@Override
+				public void afterCommit() {
+					evict.run();
+				}
+			});
+		}
+		else {
+			evict.run();
+		}
 	}
 
 	@Override
@@ -163,12 +233,15 @@ public class ProjectPartnerServiceImpl extends BaseService<ProjectPartnerMapper,
 	@Override
 	@SneakyThrows
 	public void importPartner(WhiteListRequest request) {
+		ExcelImportSecurity.validateFile(request.getFile());
+		ExcelImportSecurity.RowGuard rowGuard = ExcelImportSecurity.newRowGuard();
 		List<String> userIds = new ArrayList<>();
 		try (InputStream is = request.getFile().getInputStream(); ReadableWorkbook wb = new ReadableWorkbook(is)) {
 			wb.getSheets().forEach(sheet -> {
 				int[] rowNum = { 1 };
 				try (Stream<Row> rows = sheet.openStream()) {
 					rows.forEach(r -> {
+						rowGuard.validate(r);
 						if (r.getRowNum() == 1) {
 							return;
 						}

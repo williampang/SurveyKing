@@ -19,9 +19,9 @@ public interface StorageService {
 	// */
 	// StorePath uploadImage(UploadFileRequest request);
 
-	byte[] download(String filePath);
-
 	InputStream downloadAsStream(String filePath);
+
+	void deleteFile(String filePath);
 
 	String getThumbImageFilePath(String filePath);
 

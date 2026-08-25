@@ -46,4 +46,16 @@ public class File extends BaseModel {
 	 */
 	private Integer shared;
 
+	/** 文件所属项目 */
+	private String projectId;
+
+	/** 文件所属问题 */
+	private String questionId;
+
+	/** 文件绑定的答卷，绑定后不可被其他答卷复用 */
+	private String answerId;
+
+	/** 原始文件大小，单位字节 */
+	private Long fileSize;
+
 }

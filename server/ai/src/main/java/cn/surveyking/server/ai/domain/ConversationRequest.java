@@ -20,4 +20,9 @@ public class ConversationRequest {
 	 */
 	private String modelType;
 
+	/**
+	 * Model ID selected by the client.
+	 */
+	private String model;
+
 }

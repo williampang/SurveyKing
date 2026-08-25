@@ -63,7 +63,7 @@ docker run -d -p 1991:1991 -v /my/logs:/files -v /my/logs:/logs
 java -jar surveyking-v0.x.x.jar
 ```
 
-打开浏览器，访问 [http://localhost:1991](http://localhost:1991) 即可，系统首次启动之后会自动创建 admin 用户，账号/密码（*admin/123456*），登录系统之后可以通过用户管理界面来修改密码。
+打开浏览器，访问 [http://localhost:1991](http://localhost:1991) 即可。默认账号密码为 `admin`/`123456`，首次登录后请立即修改为 8-16 位且包含大写字母、小写字母和数字的强密码。
 
 <!-- ### h2 启动方式
 

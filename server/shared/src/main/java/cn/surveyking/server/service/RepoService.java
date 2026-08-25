@@ -65,6 +65,8 @@ public interface RepoService {
 
 	PaginationResponse<UserBookView> listUserBook(UserBookQuery query);
 
+	SurveySchema getUserBookQuestion(String id);
+
 	void createUserBook(UserBookRequest request);
 
 	UserBookView updateUserBook(UserBookRequest request);

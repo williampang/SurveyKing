@@ -26,8 +26,8 @@ import org.dhatim.fastexcel.reader.Row;
 import org.dhatim.fastexcel.reader.Sheet;
 import org.springframework.beans.BeanUtils;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -134,6 +134,8 @@ public class AnswerServiceImpl extends ServiceImpl<AnswerMapper, Answer> impleme
 						FileQuery query = new FileQuery();
 						query.setType(StorageTypeEnum.ANSWER_ATTACHMENT.getType());
 						query.setIds(ids);
+						query.setProjectId(view.getProjectId());
+						query.setQuestionId(questionId);
 						// 图片上传和签名需要做一个合并
 						view.getAttachment().addAll(fileService.listFiles(query));
 					}
@@ -386,6 +388,8 @@ public class AnswerServiceImpl extends ServiceImpl<AnswerMapper, Answer> impleme
 		if (request.getProjectId() != null) {
 			assertProjectAccess(request.getProjectId());
 		}
+		ExcelImportSecurity.validateFile(request.getFile());
+		ExcelImportSecurity.RowGuard rowGuard = ExcelImportSecurity.newRowGuard();
 		AnswerUploadView view = new AnswerUploadView();
 		try (InputStream is = request.getFile().getInputStream(); ReadableWorkbook wb = new ReadableWorkbook(is)) {
 			Sheet sheet = wb.getFirstSheet();
@@ -395,6 +399,7 @@ public class AnswerServiceImpl extends ServiceImpl<AnswerMapper, Answer> impleme
 			try (Stream<Row> rows = sheet.openStream()) {
 				// 第一行作为行头
 				rows.forEach(r -> {
+					rowGuard.validate(r);
 					int rowNum = r.getRowNum();
 					if (rowNum == 1) {
 						if (request.getProjectId() != null) {
@@ -411,6 +416,10 @@ public class AnswerServiceImpl extends ServiceImpl<AnswerMapper, Answer> impleme
 					else {
 						// 处理答案
 						answers.add(parseRow2Answer(view, r));
+						if (answers.size() == 1000) {
+							saveBatch(answers);
+							answers.clear();
+						}
 					}
 				});
 			}
@@ -459,6 +468,25 @@ public class AnswerServiceImpl extends ServiceImpl<AnswerMapper, Answer> impleme
 		return new PaginationResponse<>(page.getTotal(), list);
 	}
 
+	@Override
+	public void deleteExercise(AnswerRequest request) {
+		if (request == null || CollectionUtils.isEmpty(request.getIds())) {
+			return;
+		}
+		Set<String> exerciseIds = request.getIds().stream().filter(StringUtils::hasText)
+				.collect(Collectors.toCollection(LinkedHashSet::new));
+		if (exerciseIds.isEmpty()) {
+			return;
+		}
+		long ownedExerciseCount = count(Wrappers.<Answer>lambdaQuery().in(Answer::getId, exerciseIds)
+				.isNotNull(Answer::getExamExerciseType).eq(Answer::getCreateBy, SecurityContextUtils.getUserId()));
+		if (ownedExerciseCount != exerciseIds.size()) {
+			throw new AccessDeniedException("只能删除自己的练习记录");
+		}
+		super.remove(Wrappers.<Answer>lambdaQuery().in(Answer::getId, exerciseIds)
+				.isNotNull(Answer::getExamExerciseType).eq(Answer::getCreateBy, SecurityContextUtils.getUserId()));
+	}
+
 	private DownloadData generateSurveyAttachment(Project project, AnswerView answer) {
 		DownloadData downloadData = new DownloadData();
 		List<FileView> files = answer.getAttachment();
@@ -501,14 +529,19 @@ public class AnswerServiceImpl extends ServiceImpl<AnswerMapper, Answer> impleme
 						answer.getAttachment().forEach(attachment -> {
 							serialNum[0] += 1;
 							serialNum[1] += 1;
-							ByteArrayResource resource = (ByteArrayResource) fileService
-									.loadFile(new FileQuery(attachment.getId())).getBody();
+							Resource resource = fileService.loadFile(new FileQuery(attachment.getId())).getBody();
 							String parsedFileName = parseAttachmentNameByExp(answer, query.getNameExp(), attachment,
 									serialNum, uploadQuestions);
-							ZipEntry entry = new ZipEntry(parsedFileName);
-							try {
+							String entryName = sanitizeZipEntryName(parsedFileName, "attachment-" + serialNum[0]);
+							ZipEntry entry = new ZipEntry(entryName);
+							try (InputStream resourceInputStream = Objects.requireNonNull(resource).getInputStream()) {
 								zout.putNextEntry(entry);
-								zout.write(resource.getByteArray());
+								byte[] buffer = new byte[8192];
+								int read;
+								while ((read = resourceInputStream.read(buffer)) != -1) {
+									zout.write(buffer, 0, read);
+								}
+								zout.closeEntry();
 							}
 							catch (IOException e) {
 								e.printStackTrace();
@@ -520,7 +553,8 @@ public class AnswerServiceImpl extends ServiceImpl<AnswerMapper, Answer> impleme
 					if (DownloadQuery.DownloadType.answerAttachment.equals(query.getType())) {
 						ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 						export(project, answers, byteArrayOutputStream);
-						ZipEntry entry = new ZipEntry(project.getName() + ".xlsx");
+						ZipEntry entry = new ZipEntry(
+								sanitizeZipEntryName(project.getName() + ".xlsx", "answers.xlsx"));
 						zout.putNextEntry(entry);
 						zout.write(byteArrayOutputStream.toByteArray());
 					}
@@ -662,6 +696,30 @@ public class AnswerServiceImpl extends ServiceImpl<AnswerMapper, Answer> impleme
 		return fileNameWithoutSuffix;
 	}
 
+	private String sanitizeZipEntryName(String fileName, String fallbackName) {
+		String normalized = StringUtils.hasText(fileName) ? fileName.replace('\\', '/') : fallbackName;
+		int lastSeparator = normalized.lastIndexOf('/');
+		if (lastSeparator >= 0) {
+			normalized = normalized.substring(lastSeparator + 1);
+		}
+		StringBuilder safeName = new StringBuilder();
+		for (int i = 0; i < normalized.length(); i++) {
+			char ch = normalized.charAt(i);
+			if (ch < 0x20 || ch == 0x7f || ch == ':' || ch == '*' || ch == '?' || ch == '"' || ch == '<' || ch == '>'
+					|| ch == '|') {
+				safeName.append('_');
+			}
+			else {
+				safeName.append(ch);
+			}
+		}
+		String result = safeName.toString().replace("..", "_").trim();
+		if (!StringUtils.hasText(result) || ".".equals(result) || "..".equals(result)) {
+			result = fallbackName;
+		}
+		return result.length() > 200 ? result.substring(0, 200) : result;
+	}
+
 	/**
 	 * 答案保存之前计算考试分值、每题得分情况
 	 * @param answer
@@ -669,6 +727,12 @@ public class AnswerServiceImpl extends ServiceImpl<AnswerMapper, Answer> impleme
 	 */
 	private Answer beforeSaveAnswer(Answer answer) {
 		ProjectView project = projectService.getProject(answer.getProjectId());
+		Answer previousAnswer = StringUtils.hasText(answer.getId()) ? getById(answer.getId()) : null;
+		SurveySchema answerSurvey = answer.getSurvey() != null ? answer.getSurvey()
+				: previousAnswer != null && previousAnswer.getSurvey() != null ? previousAnswer.getSurvey()
+						: project.getSurvey();
+		fileService.validateAndBindAnswerFiles(answer.getProjectId(), answer.getId(), answerSurvey, answer.getAnswer(),
+				previousAnswer == null ? null : previousAnswer.getAnswer());
 		computeExamScore(answer, project);
 		updateLinkSurveyAnswer(answer, project);
 		return answer;

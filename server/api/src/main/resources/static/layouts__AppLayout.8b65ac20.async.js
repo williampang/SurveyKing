@@ -1,0 +1,1 @@
+(self["webpackChunksurvey_king"]=self["webpackChunksurvey_king"]||[]).push([[8076],{98663:function(e,n,u){"use strict";u.r(n),u.d(n,{AppLayout:function(){return c}});var r=u(70769),t=u(59496),i=u(4637),c=function(e){var n=(0,t.useMemo)((function(){return new r.ZP}),[]);return(0,i.jsx)(r.Il.Provider,{value:n,children:e.children})};n["default"]=c}}]);

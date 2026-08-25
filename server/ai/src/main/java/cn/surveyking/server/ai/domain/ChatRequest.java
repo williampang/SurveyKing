@@ -31,6 +31,11 @@ public class ChatRequest {
 	 */
 	private String systemPrompt;
 
+	/**
+	 * 用户界面语言，用于约束生成内容的输出语言
+	 */
+	private String locale;
+
 	@Data
 	public static class EnterMessage {
 

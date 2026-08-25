@@ -18,4 +18,6 @@ public final class CacheConsts {
 
 	public static final String projectPermissionCacheName = "projectPermissionCache";
 
+	public static final String oauthFlowCacheName = "oauthFlowCache";
+
 }

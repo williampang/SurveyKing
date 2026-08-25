@@ -3,11 +3,13 @@ package cn.surveyking.server.service;
 import cn.surveyking.server.core.constant.AppConsts;
 import cn.surveyking.server.domain.dto.FileQuery;
 import cn.surveyking.server.domain.dto.FileView;
+import cn.surveyking.server.domain.dto.SurveySchema;
 import cn.surveyking.server.domain.dto.UploadFileRequest;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 /**
@@ -24,9 +26,14 @@ public interface FileService {
 
 	ResponseEntity<Resource> loadFile(FileQuery query);
 
+	ResponseEntity<Resource> loadPublicFile(FileQuery query);
+
 	ResponseEntity<Resource> loadUserFile(FileQuery query);
 
 	void deleteFile(String id);
+
+	void validateAndBindAnswerFiles(String projectId, String answerId, SurveySchema survey,
+			LinkedHashMap<String, Object> answer, LinkedHashMap<String, Object> previousAnswer);
 
 	/**
 	 * 是否支持该格式的图片上传

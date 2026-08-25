@@ -5,6 +5,7 @@ import cn.surveyking.server.core.constant.TagCategoryEnum;
 import cn.surveyking.server.core.uitls.AnswerScoreEvaluator;
 import cn.surveyking.server.core.uitls.RepoTemplateExcelParseHelper;
 import cn.surveyking.server.core.uitls.RepoTemplateI18n;
+import cn.surveyking.server.core.uitls.SchemaHelper;
 import cn.surveyking.server.core.uitls.SecurityContextUtils;
 import cn.surveyking.server.core.uitls.ContextHelper;
 import cn.surveyking.server.core.uitls.ExcelExporter;
@@ -270,6 +271,20 @@ public class RepoServiceImpl extends BaseService<RepoMapper, Repo> implements Re
 	}
 
 	@Override
+	public SurveySchema getUserBookQuestion(String id) {
+		UserBook userBook = userBookService.getOne(Wrappers.<UserBook>lambdaQuery().eq(UserBook::getId, id)
+				.eq(UserBook::getCreateBy, SecurityContextUtils.getUserId()));
+		if (userBook == null) {
+			throw new AccessDeniedException("笔记不存在或无权查看");
+		}
+		Template template = templateService.getReadableTemplate(userBook.getTemplateId());
+		SurveySchema schema = template.getTemplate().deepCopy();
+		schema.setId(template.getId());
+		SchemaHelper.ignoreAttributes(schema, "examCorrectAnswer", "examScore", "examMatchRule", "examAnalysis");
+		return schema;
+	}
+
+	@Override
 	public void createUserBook(UserBookRequest request) {
 		UserBook userBook = userBookViewMapper.fromRequest(request);
 		userBookService.save(userBook);
@@ -279,16 +294,30 @@ public class RepoServiceImpl extends BaseService<RepoMapper, Repo> implements Re
 	public UserBookView updateUserBook(UserBookRequest request) {
 		UserBookView result = new UserBookView();
 		UserBook userBook = userBookViewMapper.fromRequest(request);
-		if (userBook.getId() == null) {
-			UserBook exist = userBookService
-					.getOne(Wrappers.<UserBook>lambdaQuery().eq(UserBook::getTemplateId, request.getTemplateId())
-							.eq(UserBook::getCreateBy, SecurityContextUtils.getUserId()).last("limit 1"));
-			if (exist != null) {
-				userBook.setId(exist.getId());
+		boolean noteProvided = request.getNote() != null;
+		String normalizedNote = noteProvided ? request.getNote().trim() : null;
+		userBook.setNote(normalizedNote);
+		UserBook existingUserBook = null;
+		if (userBook.getId() != null) {
+			assertOwnedUserBook(userBook.getId());
+			existingUserBook = userBookService.getById(userBook.getId());
+		}
+		else if (StringUtils.hasText(request.getTemplateId())) {
+			List<UserBook> userBooks = userBookService
+					.list(Wrappers.<UserBook>lambdaQuery().eq(UserBook::getTemplateId, request.getTemplateId())
+							.eq(UserBook::getCreateBy, SecurityContextUtils.getUserId())
+							.orderByDesc(UserBook::getUpdateAt).orderByDesc(UserBook::getCreateAt));
+			existingUserBook = selectUserBookForUpdate(userBooks, request);
+			if (existingUserBook != null) {
+				userBook.setId(existingUserBook.getId());
 			}
 		}
+		if (noteProvided && !StringUtils.hasText(normalizedNote) && request.getAnswer() == null) {
+			clearUserBookNote(existingUserBook);
+			return result;
+		}
 		if (request.getAnswer() != null) {
-			Template template = templateService.getById(request.getTemplateId());
+			Template template = templateService.getReadableTemplate(request.getTemplateId());
 			userBook.setRepoId(template.getRepoId());
 			userBook.setName(template.getName());
 			userBook.setType(BOOK_TYPE_WRONG);
@@ -317,9 +346,13 @@ public class RepoServiceImpl extends BaseService<RepoMapper, Repo> implements Re
 			result.setQscore(qScore);
 			// 保存临时答案
 			if (request.getAnswerId() != null) {
-				Answer answer = answerService.getOne(
-						Wrappers.<Answer>lambdaQuery().select(Answer::getId, Answer::getTempAnswer, Answer::getExamInfo)
-								.eq(Answer::getId, request.getAnswerId()));
+				Answer answer = answerService.getOne(Wrappers.<Answer>lambdaQuery()
+						.select(Answer::getId, Answer::getRepoId, Answer::getTempAnswer, Answer::getExamInfo)
+						.eq(Answer::getId, request.getAnswerId())
+						.eq(Answer::getCreateBy, SecurityContextUtils.getUserId()));
+				if (answer == null || !Objects.equals(answer.getRepoId(), template.getRepoId())) {
+					throw new AccessDeniedException("无权修改该答卷的练习记录");
+				}
 				LinkedHashMap tempAnswer = Optional.ofNullable(answer.getTempAnswer()).orElse(new LinkedHashMap());
 				tempAnswer.putAll(request.getAnswer());
 				answer.setTempAnswer(tempAnswer);
@@ -332,6 +365,12 @@ public class RepoServiceImpl extends BaseService<RepoMapper, Repo> implements Re
 				answerService.updateById(answer);
 			}
 		}
+		else if (noteProvided && existingUserBook == null) {
+			Template template = templateService.getReadableTemplate(request.getTemplateId());
+			userBook.setRepoId(template.getRepoId());
+			userBook.setName(template.getName());
+			userBook.setType(BOOK_TYPE_WRONG);
+		}
 		if (userBook.getId() != null) {
 			userBookService.updateById(userBook);
 		}
@@ -343,18 +382,57 @@ public class RepoServiceImpl extends BaseService<RepoMapper, Repo> implements Re
 
 	}
 
+	private UserBook selectUserBookForUpdate(List<UserBook> userBooks, UserBookRequest request) {
+		if (CollectionUtils.isEmpty(userBooks)) {
+			return null;
+		}
+		if (request.getAnswer() != null) {
+			return userBooks.stream().filter(x -> Objects.equals(x.getType(), BOOK_TYPE_WRONG)).findFirst()
+					.orElse(null);
+		}
+		if (request.getNote() != null) {
+			return userBooks.stream().filter(x -> StringUtils.hasText(x.getNote())).findFirst()
+					.orElseGet(() -> userBooks.stream().filter(x -> Objects.equals(x.getType(), BOOK_TYPE_WRONG))
+							.findFirst().orElse(userBooks.get(0)));
+		}
+		return null;
+	}
+
+	private void clearUserBookNote(UserBook userBook) {
+		if (userBook == null) {
+			return;
+		}
+		if (!Objects.equals(userBook.getType(), UserBookServiceImpl.BOOK_TYPE_FAVORITE)
+				&& userBook.getWrongTimes() == null && userBook.getCorrectTimes() == null) {
+			userBookService.remove(Wrappers.<UserBook>lambdaQuery().eq(UserBook::getId, userBook.getId())
+					.eq(UserBook::getCreateBy, SecurityContextUtils.getUserId()));
+			return;
+		}
+		userBookService.update(Wrappers.<UserBook>lambdaUpdate().eq(UserBook::getId, userBook.getId())
+				.eq(UserBook::getCreateBy, SecurityContextUtils.getUserId()).set(UserBook::getNote, null));
+	}
+
 	@Override
 	public void deleteUserBook(UserBookRequest request) {
 		if (request.getId() != null) {
-			userBookService.removeById(request.getId());
+			userBookService.remove(Wrappers.<UserBook>lambdaQuery().eq(UserBook::getId, request.getId())
+					.eq(UserBook::getCreateBy, SecurityContextUtils.getUserId()));
 		}
 		if (CollectionUtils.isNotEmpty(request.getIds())) {
-			userBookService.removeByIds(request.getIds());
+			userBookService.remove(Wrappers.<UserBook>lambdaQuery().in(UserBook::getId, request.getIds())
+					.eq(UserBook::getCreateBy, SecurityContextUtils.getUserId()));
 		}
 		if (request.getTemplateId() != null) {
 			userBookService
 					.remove(Wrappers.<UserBook>lambdaUpdate().eq(UserBook::getTemplateId, request.getTemplateId())
 							.eq(UserBook::getCreateBy, SecurityContextUtils.getUserId()));
+		}
+	}
+
+	private void assertOwnedUserBook(String userBookId) {
+		if (userBookService.count(Wrappers.<UserBook>lambdaQuery().eq(UserBook::getId, userBookId)
+				.eq(UserBook::getCreateBy, SecurityContextUtils.getUserId())) == 0) {
+			throw new AccessDeniedException("无权修改该笔记");
 		}
 	}
 

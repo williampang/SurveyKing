@@ -2,6 +2,8 @@ package cn.surveyking.server.domain.dto;
 
 import lombok.Data;
 
+import javax.validation.constraints.NotBlank;
+
 /**
  * @author javahuang
  * @date 2022/4/27
@@ -46,6 +48,7 @@ public class RepoRequest {
 	/**
 	 * 题库分类
 	 */
+	@NotBlank(message = "题库分类不能为空")
 	private String category;
 
 	/**
