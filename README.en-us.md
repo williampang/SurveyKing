@@ -1,127 +1,175 @@
-# SurveyKing
+<p align="center">
+  <img src="website/static/img/surveyking.svg" alt="SurveyKing" height="76" />
+</p>
 
-English | [简体中文](./README.md)
+<h1 align="center">SurveyKing</h1>
 
-![preview-surveyking](./docs/preview.gif)
+<p align="center">
+  <strong>A powerful, easy-to-deploy open-source platform for surveys, exams, and question practice</strong>
+</p>
 
-[BMI calculator survey](https://surveyking.cn/s/q12345)
+<p align="center">
+  Create content, collect responses, run exams, practise from question banks, analyse data, and manage access in one system.
+</p>
 
-## Background
+<p align="center">
+  <a href="https://gitee.com/surveyking/surveyking/stargazers"><img src="https://gitee.com/surveyking/surveyking/badge/star.svg?theme=dark" alt="Gitee Stars" /></a>
+  <a href="https://gitee.com/surveyking/surveyking/members"><img src="https://gitee.com/surveyking/surveyking/badge/fork.svg?theme=dark" alt="Gitee Forks" /></a>
+  <a href="https://github.com/javahuang/surveyking/stargazers"><img src="https://img.shields.io/github/stars/javahuang/surveyking?style=flat-square&logo=github" alt="GitHub Stars" /></a>
+  <a href="https://github.com/javahuang/surveyking/network/members"><img src="https://img.shields.io/github/forks/javahuang/surveyking?style=flat-square&logo=github" alt="GitHub Forks" /></a>
+  <img src="https://img.shields.io/badge/version-v1.13.0-brightgreen?style=flat-square" alt="Version" />
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License" /></a>
+  <a href="https://hub.docker.com/r/surveyking/surveyking"><img src="https://img.shields.io/docker/pulls/surveyking/surveyking?style=flat-square&logo=docker" alt="Docker Pulls" /></a>
+</p>
 
-Based on Ali's open source [formily](https://github.com/alibaba/formily) form solution self-developed survey editor, using the latest front-end and back-end technology (React+SpringBoot+AntDesignUI) to build a complete survey system.
+<p align="center">
+  <a href="https://surveyking.cn/">Website</a> ·
+  <a href="https://surveyking.cn/open-source/deploy/">Deployment</a> ·
+  <a href="https://surveyking.cn/help/quickstart/">Documentation</a> ·
+  <a href="https://s.surveyking.cn/">Live Demo</a> ·
+  <a href="https://docs.qq.com/sheet/DZEVveUVMSHpVZkJw">Feature List</a>
+</p>
 
-SurveyKing is one of the known open source survey systems that has **the most powerful functions**, **the simplest installation**, and **the best comprehensive experience**.
+<p align="center">
+  <a href="./README.md">简体中文</a> · English
+</p>
 
-**Simple**, **Easy to use**, and **Professional** are the continuous development concepts of SurveyKing. Large and medium-sized enterprises and even individuals can use SurveyKing to quickly build their own online survey system.
+> **Our goal is to build the easiest-to-deploy and most complete open-source survey and examination system.**
+>
+> SurveyKing combines surveys, exams, question-bank practice, analytics, administration, AI, internationalisation, and third-party integrations in one self-hosted platform. Its built-in H2 database requires no separate database installation, while Windows packages and BaoTa provide one-click deployment options.
 
-## 🚀 Quickly build a questionnaire system in 1 minute
+## Three core scenarios
 
-1. First [install Java runtime environment](https://www.java.com/en/download/manual.jsp) (if the machine already has a Java environment, you can ignore it)
-2. Download [Volume King Installation Package](https://github.com/javahuang/SurveyKing/releases/download/v0.2.0/surveyking-h2-v0.2.0.jar)
-3. Double-click to run
-4. Open <http://localhost:1991> and sign in with the default account `admin` and password `123456`. Change it immediately to an 8-16 character password containing uppercase letters, lowercase letters, and digits.
+| Surveys | Exams | Question practice |
+| --- | --- | --- |
+| 20+ question types, conditional logic, themes, publishing controls, and mobile responses | Question banks, correct answers, scoring rules, automatic grading, and result analysis | Sequential, random, and incorrect-answer practice with mobile-friendly progress tracking |
+| Create with AI, Excel, plain text, templates, or the visual editor | Reuse questions, randomise questions and options, and configure answer explanations | Reuse the same question bank across exams and self-directed practice |
 
-## Features
+## Platform capabilities
 
-- 🥇 Support a variety of question types, such as fill-blank, selection, dropdown, cascade, matrix, pagination, signature, question-group, etc.
-- 🎉 Computable, divided into **logical calculation**, **value calculation**, **text replacement calculation**, **required calculation**, [click to experience](https://surveyking.cn/s/logic6)
-- 🦋 Questions and options support fast rich text editing
-- 🥊 Responsive layout, all pages have a good operating experience on PC and mobile
-- 🥂 Various survey settings, such as support for temporary storage, survey modification, password setting, etc.
-- 🎇 Data, support survey data adding, editing, marking, exporting, previewing and downloading attachments
-- 🎨 Reports, support real-time statistical analysis of problems and display the output in the form of graphs (bar graphs, column graphs, fan graphs) and tables
-- 🚀 Simple installation and deployment (**The fastest deployment in 1 minute**), supports nginx deployment and one-click startup
-- 🎁 The backend supports a variety of databases (embedded h2), which can support all relational databases with jdbc driver, and mongodb will be supported in the future.
-- 🐯 Safe, reliable, stable and high-performance back-end API service
-- 🙆 Support complete RBAC permission control (cn.surveyking.server.workflow will be introduced later)
-- 🌈 Support internationalization (under improvement)
--...
+| Module | Capabilities |
+| --- | --- |
+| **Data** | Response editing, filters, imports, exports, printing, attachment downloads, and real-time reports |
+| **Administration** | Users, roles, departments, positions, organisations, collaboration, and RBAC permissions |
+| **AI** | Natural-language survey and exam creation, streaming generation, live preview, and OpenAI-compatible APIs |
+| **Internationalisation** | Multilingual UI and prompts, configurable default locale, multilingual AI generation, and extensible locale resources |
 
-## Install
+## Integrations
 
-### Install via distribution
+| Area | Supported integrations |
+| --- | --- |
+| **AI providers** | OpenAI-compatible APIs, including SiliconFlow-hosted DeepSeek, Qwen, and Llama models |
+| **OAuth** | Google OAuth, WeChat Open Platform QR login, WeChat Official Account authorisation, and account linking |
+| **WeChat surveys** | WeChat-only responses with optional nickname and avatar collection |
+| **Maps** | Amap key and security-code configuration for location questions |
+| **Deployment** | Windows packages, Docker Hub, Alibaba Cloud registry, BaoTa, and EazyDevelop |
+| **Storage** | Built-in H2 for evaluation and MySQL for production deployments |
 
-Currently adapted to h2 database and mysql database
+## Why SurveyKing
 
-Click [Download surveyking-h2 version](https://github.com/javahuang/SurveyKing/releases/download/v0.2.0/surveyking-h2-v0.2.0.jar) to the local
+- **One integrated product:** surveys, exams, and practice share question banks, users, permissions, and analytics.
+- **Self-hosted by design:** your organisation controls the application and its data.
+- **Low deployment overhead:** use the built-in H2 database with Windows packages, one-click BaoTa deployment, or containers.
+- **Complete workflow:** create, publish, respond, grade, practise, report, and export in one platform.
+- **Flexible logic:** visibility, branching, calculations, validation, dynamic required fields, and automatic selection.
+- **Open and extensible:** AI, OAuth, WeChat, Amap, and locale resources can be configured or extended.
 
-Click [Download surveyking-mysql version](https://github.com/javahuang/SurveyKing/releases/download/v0.2.0/surveyking-mysql-v0.2.0.jar) to the local
+## Product preview
 
-### Use source code to compile and install
+### Survey analytics
 
-The h2 version of the installation package is built by default.
+The four views show the visual editor, its mobile preview, the respondent-facing form, and analytics generated from 45 representative demo responses.
+
+<table>
+  <tr>
+    <td width="50%" align="center"><a href="docs/readme/survey-editor.webp"><img src="docs/readme/survey-editor.webp" alt="Survey editor" width="100%" /></a><br /><sub>Visual editor</sub></td>
+    <td width="50%" align="center"><a href="docs/readme/survey-mobile-preview.webp"><img src="docs/readme/survey-mobile-preview.webp" alt="Mobile survey preview" width="100%" /></a><br /><sub>Mobile preview</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><a href="docs/readme/survey-answer-ui.webp"><img src="docs/readme/survey-answer-ui.webp" alt="Respondent-facing survey" width="100%" /></a><br /><sub>Respondent-facing form</sub></td>
+    <td width="50%" align="center"><a href="docs/readme/survey-report.webp"><img src="docs/readme/survey-report.webp" alt="Survey analytics" width="100%" /></a><br /><sub>Survey analytics</sub></td>
+  </tr>
+</table>
+
+### Exams and automatic grading
+
+The four views show the exam editor, its mobile preview, the candidate-facing exam, and a grade table containing 32 demo submissions with scores ranging from 40 to 100.
+
+<table>
+  <tr>
+    <td width="50%" align="center"><a href="docs/readme/exam-editor.webp"><img src="docs/readme/exam-editor.webp" alt="Exam editor" width="100%" /></a><br /><sub>Exam editor</sub></td>
+    <td width="50%" align="center"><a href="docs/readme/exam-mobile-preview.webp"><img src="docs/readme/exam-mobile-preview.webp" alt="Mobile exam preview" width="100%" /></a><br /><sub>Mobile preview</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><a href="docs/readme/exam-answer-ui.webp"><img src="docs/readme/exam-answer-ui.webp" alt="Candidate-facing exam" width="100%" /></a><br /><sub>Candidate-facing exam</sub></td>
+    <td width="50%" align="center"><a href="docs/readme/exam-data.webp"><img src="docs/readme/exam-data.webp" alt="Exam grades" width="100%" /></a><br /><sub>Grade data</sub></td>
+  </tr>
+</table>
+
+### Practice mode on desktop and mobile
+
+Use the same question bank for exams and self-directed practice. The desktop view provides an answer card, question flags, configurable removal from the incorrect-answer set, and AI explanations. Mobile practice adds instant grading, answer comparison, favourites, notes, and practice settings.
+
+<p align="center">
+  <img src="docs/readme/practice-desktop.webp" alt="Practice mode on desktop" width="69%" />
+  <img src="docs/readme/practice-mobile.webp" alt="Practice mode on mobile" width="20%" />
+</p>
+
+### AI-assisted creation
+
+Describe the survey or exam you need and preview the generated structure before creating the project.
+
+<p align="center">
+  <img src="docs/readme/ai-create.webp" alt="AI-assisted creation" width="72%" />
+</p>
+
+## Quick start
+
+Start SurveyKing with its built-in H2 database:
 
 ```bash
-# Download source code
-git clone https://github.com/javahuang/SurveyKing.git
-
-# Start building
-gradle clean :api:build -P pro -x test
-
-# start operation
-java -jar api/build/libs/surveyking-v0.1.0.jar
+docker run -d \
+  --name surveyking \
+  -p 1991:1991 \
+  surveyking/surveyking:latest
 ```
 
-### Quick start with docker
-
-When you start the SurveyKing mirroring, you can specify the SurveyKing mount parameters and save the log files and built-in database to your local. (There are still some problems with the docker version, to be resolved)
+If Docker Hub is slow in your region, use the Alibaba Cloud registry:
 
 ```bash
-docker run -p 1991:1991 surveyking/surveyking
-# Mount data file
-docker run -p 1991:1991 -v /surveyking:/surveyking surveyking/surveyking
+docker run -d \
+  --name surveyking \
+  -p 1991:1991 \
+  registry.cn-hangzhou.aliyuncs.com/surveyking/surveyking:latest
 ```
 
-## Usage
+Open [http://localhost:1991](http://localhost:1991):
 
-Since this system is built in Java, it needs to rely on the Java runtime environment, which can be downloaded via [Java download for all operating systems
-](https://www.java.com/en/download/manual.jsp) to pre-install the java environment.
+- Username: `admin`
+- Password: `123456`
+- Change the default password immediately after the first login. The new password must be 8-16 characters and contain uppercase letters, lowercase letters, and digits.
 
-Follow the instructions below to configure different databases. If the front-end needs to be deployed with nginx, refer to using nginx to deploy the front-end.
+For Windows packages, MySQL, Nginx, BaoTa, and other deployment options, see the [deployment documentation](https://surveyking.cn/open-source/deploy/).
 
-Windows and mac support double-click to run, or open a command line window to execute the following commands
+## Technology
 
-```bash
-java -jar surveyking-v0.1.0.jar
-```
+| Layer | Technology |
+| --- | --- |
+| Frontend | React, Ant Design, responsive web UI |
+| Backend | Java, Spring Boot 2.7, Spring Security, MyBatis-Plus |
+| Database | H2, MySQL |
+| Deployment | Windows, Docker, Nginx, BaoTa, EazyDevelop |
 
-Open the browser and visit <http://localhost:1991>. Sign in with the default account `admin` and password `123456`, then immediately change it to an 8-16 character password containing uppercase letters, lowercase letters, and digits.
+## Documentation and community
 
-### h2 startup method
+- [Quick start](https://surveyking.cn/help/quickstart/)
+- [Deployment guide](https://surveyking.cn/open-source/deploy/)
+- [AI configuration](https://surveyking.cn/open-source/docs/ai/)
+- [Complete feature list](https://docs.qq.com/sheet/DZEVveUVMSHpVZkJw)
+- Issues: [Gitee](https://gitee.com/surveyking/surveyking/issues) · [GitHub](https://github.com/javahuang/surveyking/issues)
 
-Without any configuration, the database startup script will be created automatically. If you need to change the port number, refer to the defined port of mysql startup mode.
+If SurveyKing is useful to you, please consider starring the project on Gitee or GitHub.
 
-### mysql startup mode
+## Licence
 
-1. First create the mysql database, and then execute the initialization script, [download script](https://raw.githubusercontent.com/javahuang/SurveyKing/master/rdbms/src/main/resources/scripts/init-mysql.sql).
-2. Then create a new `application.properties` file under the current directory.
-
-  ```properties
-  server.port=1991 # Port number (optional, default 1991)
-  spring.datasource.url=jdbc:mysql://<ip>:<port>/<dbname> # Database connection address, replace with your mysql database address
-  spring.datasource.username=username # Database account (required)
-  spring.datasource.password=password # database password (required)
-  ```
-
-### Deploy the front-end with nginx
-
-Download [static resource files under this directory](https://github.com/javahuang/SurveyKing/tree/master/api/src/main/resources/static) and deploy directly to nginx.
-
-Then configure the proxy to proxy to the back-end api service.
-
-## Online experience
-
-Demo address: <https://surveyking.cn>
-
-Click *Try it*, no need to register and log in (-_-||, the server bandwidth is only 1M, maybe the first load is slightly slower)
-
-## Contact the author
-
-The back-end code is completely open source, and the front-end code will have an open source plan after it is stabilized. If you find it helpful, you can click the star in the upper right corner.
-
-If you encounter any problems or suggestions, Please send me an issue.
-
-## LICENSE
-
-SurveyKing is open source software licensed as
-[MIT.](https://github.com/javahuang/SurveyKing/blob/master/LICENSE)
+SurveyKing is released under the [MIT License](./LICENSE).
