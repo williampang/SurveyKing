@@ -14,13 +14,13 @@ page {
 .home-hero {
   background: linear-gradient(135deg, #1890ff 0%, #36cfc9 100%);
   border-radius: 20rpx;
-  padding: 64rpx 40rpx;
+  padding: 26rpx 26rpx;
   text-align: center;
   color: #fff;
   box-shadow: 0 8rpx 24rpx rgba(24, 144, 255, 0.25);
   margin-bottom: 24rpx;
 }
-.home-logo { font-size: 88rpx; line-height: 1; margin-bottom: 20rpx; }
+.home-logo { font-size: 88rpx; line-height: 1; margin-bottom: 20rpx; display: none; }
 .home-title { font-size: 44rpx; font-weight: 700; margin-bottom: 16rpx; }
 .home-slogan { font-size: 26rpx; opacity: 0.9; letter-spacing: 2rpx; }
 
@@ -73,8 +73,16 @@ page {
 }
 .demo-item:last-child { margin-bottom: 0; }
 .demo-item:active { background: #e8f3ff; }
-.demo-main { flex: 1; }
-.demo-name { font-size: 30rpx; font-weight: 600; color: #1d2129; margin-bottom: 6rpx; }
+.demo-main { flex: 1; min-width: 0; }
+.demo-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1d2129;
+  margin-bottom: 6rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .demo-id { font-size: 22rpx; color: #86909c; }
 .demo-arrow { font-size: 40rpx; color: #c9cdd4; line-height: 1; }
 

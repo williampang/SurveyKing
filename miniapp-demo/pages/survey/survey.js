@@ -2,6 +2,7 @@
 // 单页版：一个大按钮 → 加载并渲染 VEb4hf 全部题型 → 就地校验 → 提交
 const validator = require('../../utils/validator.js');
 const storage = require('../../utils/storage.js');
+const formula = require('../../utils/formula.js');
 
 const DEFAULT_BASE_URL = 'https://test.huaiyu.cn';
 const DEFAULT_SHORT_ID = 'VEb4hf';
@@ -199,6 +200,9 @@ Page({
     // 标题可能是富文本 HTML，状态栏只展示纯文本
     const plainTitle = ((project.survey && project.survey.title) || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     this.setStatus(`✅ 加载成功：${project.name || plainTitle} · ${label}`, 'ok');
+
+    // 运行公式计算与可见性联动（处理初始默认状态）
+    this._evaluateRulesAndFormulas(answers);
   },
 
   /**
@@ -240,26 +244,116 @@ Page({
   },
 
   /* ==========================================================
-   * 通用：设置答案 + 触发单题校验 + 更新进度
+   * 通用：设置答案 + 触发校验 + 更新进度 + 公式/可见性联动
    * ========================================================== */
   setAnswer(qid, value, skipValidate = false) {
     const answers = Object.assign({}, this.data.answers);
     answers[qid] = value;
     const errors = Object.assign({}, this.data.errors);
-    if (!skipValidate) {
-      const q = this.data.questions.find(x => x.id === qid);
-      if (q) {
-        const err = validator.validateQuestion(q, value);
-        if (err) errors[qid] = err; else delete errors[qid];
-      }
-    }
+
     // 统计已答数量
     let count = 0;
     this.data.questions.forEach(q => {
       if (!validator.isEmpty(answers[q.id])) count++;
     });
     const progressPct = Math.round(count / (this.data.totalCount || this.data.questions.length) * 100);
-    this.setData({ answers, errors, answeredCount: count, progressPct });
+    this.setData({ answers, answeredCount: count, progressPct });
+
+    // 触发公式与可见性计算及动态规则校验
+    this._evaluateRulesAndFormulas(answers, skipValidate ? null : qid);
+  },
+
+  /**
+   * 运行公式计算与可见性联动
+   * 1. 根据当前 answers 构造 Q1, Q1A1 等变量上下文
+   * 2. 计算每道题的 visibleRule，更新题目的 hidden/visible 状态
+   * 3. 计算富文本题目（如 Remark）中包含的 ql-formula 公式并替换展示
+   * 4. 实时执行 validateRule 规则检查并更新 errors
+   * @param {Object} [currentAnswers] - 当前全部答案字典
+   * @param {string} [changedQid] - 本次发生修改的题目 ID（若有传则重点实时更新其校验提示）
+   */
+  _evaluateRulesAndFormulas(currentAnswers, changedQid) {
+    const questions = this.data.questions;
+    if (!questions || !questions.length) return;
+
+    const answers = currentAnswers || this.data.answers || {};
+    const ctx = formula.buildVariableContext(questions, answers);
+    let questionsChanged = false;
+    const updatedQuestions = questions.map(q => {
+      let qCopy = Object.assign({}, q);
+      const attr = qCopy.attribute || {};
+
+      // 1. visibleRule 计算
+      if (attr.visibleRule) {
+        const isVisible = formula.evaluateVisibleRule(attr.visibleRule, ctx);
+        const newDisplay = isVisible ? 'visible' : 'hidden';
+        if (qCopy._display !== newDisplay) {
+          qCopy._display = newDisplay;
+          questionsChanged = true;
+        }
+      } else if (attr.display === 'hidden') {
+        // 如果题目原生配置了 display=hidden 且无 visibleRule
+        if (qCopy._display !== 'hidden') {
+          qCopy._display = 'hidden';
+          questionsChanged = true;
+        }
+      } else {
+        if (qCopy._display !== 'visible') {
+          qCopy._display = 'visible';
+          questionsChanged = true;
+        }
+      }
+
+      // 2. 富文本公式动态渲染（如 Remark 里的 SUM(Q1~Q11)）
+      const rawTitle = qCopy._rawTitle || qCopy.title || '';
+      if (rawTitle.includes('ql-formula')) {
+        if (!qCopy._rawTitle) qCopy._rawTitle = qCopy.title;
+        const renderedTitle = formula.renderFormulaHtml(qCopy._rawTitle, ctx);
+        if (qCopy.title !== renderedTitle) {
+          qCopy.title = renderedTitle;
+          questionsChanged = true;
+        }
+      }
+
+      return qCopy;
+    });
+
+    // 3. 实时更新各题校验错误（特别是配置了 validateRule 的题目，如 Q1 限制）
+    const errors = Object.assign({}, this.data.errors);
+    questions.forEach(q => {
+      const attr = q.attribute || {};
+      const val = answers[q.id];
+
+      // 若处于隐藏状态，清除可能残留的错误
+      if (q._display === 'hidden') {
+        delete errors[q.id];
+        return;
+      }
+
+      // 若题目配置了 validateRule，不论是当前改动题还是受联动影响的题均重新执行验证
+      if (attr.validateRule) {
+        const ruleRes = formula.evaluateValidateRule(attr.validateRule, ctx);
+        if (!ruleRes.valid) {
+          errors[q.id] = ruleRes.message || '输入内容不符合限制规则';
+        } else {
+          // 如果该题没有其他基础类型错误，则清除 validateRule 错误
+          const baseErr = validator.validateQuestion(q, val);
+          if (baseErr) errors[q.id] = baseErr;
+          else delete errors[q.id];
+        }
+      } else if (changedQid === q.id) {
+        // 无 validateRule 的题按常规方式校验
+        const err = validator.validateQuestion(q, val);
+        if (err) errors[q.id] = err;
+        else delete errors[q.id];
+      }
+    });
+
+    const setDataObj = { errors };
+    if (questionsChanged) {
+      setDataObj.questions = updatedQuestions;
+    }
+    this.setData(setDataObj);
   },
 
   /* ==========================================================
@@ -1090,9 +1184,11 @@ Page({
         this.setStatus('🎉 提交成功', 'ok');
         // 记录到本地"我的测评"（后端无公开接口，用 localStorage）
         const p = this.data.project || {};
+        const rawTitle = (p.survey && p.survey.title) || p.name || '';
+        const plainTitle = rawTitle.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
         storage.recordMySurvey({
           shortId: this.data.shortId,
-          title: (p.survey && p.survey.title) || p.name || '',
+          title: plainTitle || '未命名问卷',
           answers: this.data.answers   // 存表单原始答案，供再次进入回填
         });
         wx.showModal({

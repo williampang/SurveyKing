@@ -10,11 +10,11 @@
   </view>
 
   <!-- 上次提交结果提示（本地回填；后端无公开查询接口） -->
-  <view class="card last-submit-card" wx:if="{{lastSubmit}}">
+  <view class="card last-submit-card" wx:if="{{lastSubmit && !(project && project.survey && project.survey.children && project.survey.children[0] && project.survey.children[0].id === 'whitelistName')}}">
     <view class="last-submit-title">📄 已载入上次提交结果</view>
     <view class="last-submit-time" wx:if="{{lastSubmit.timeText}}">提交时间：{{lastSubmit.timeText}}</view>
     <view class="last-submit-desc">以下为上次提交的答案，可修改后重新提交</view>
-    <button class="last-submit-clear" size="mini" bindtap="onClearRefill">🗑 清空重填</button>
+    <button class="last-submit-clear" size="mini" bindtap="onClearRefill">清空重填</button>
   </view>
 
   <!-- 状态提示 -->
@@ -30,7 +30,37 @@
   </view>
 
   <!-- 问卷主体 -->
-  <block wx:if="{{project}}">
+  <block wx:if="{{project && project.survey && project.survey.children && project.survey.children[0] && project.survey.children[0].id === 'whitelistName'}}">
+    <view class="last-submit-title" style="text-align: center;margin: 36px 0;">请先校验手机号码</view>
+    <view id="q-{{q.id}}" class="card question {{errors[q.id] ? 'has-error' : ''}}"
+          wx:for="{{questions}}" wx:key="id" wx:for-item="q" wx:for-index="qi"
+          wx:if="{{q._display !== 'hidden'}}">
+          <!-- ============ FillBlank 单行填空（helper.fillBlankMode 判定控件，时间格式优先） ============ -->
+      <block wx:if="{{q.type === 'FillBlank'}}">
+        <!-- 白名单登录字段（后端 whitelistType=4 时自动注入 id=whitelistName）：
+             一键获取微信手机号 → 回填 → POST /api/public/validateProject 校验名单
+             → 后端直接返回真实问卷，本地重新渲染进入正常答卷流程 -->
+        <view wx:if="{{q.id === 'whitelistName'}}" class="whitelist-phone">
+          <button class="phone-btn" open-type="getPhoneNumber"
+                  bindgetphonenumber="onGetPhoneNumber"
+                  data-qid="{{q.id}}"
+                  loading="{{phoneLoading}}" disabled="{{phoneLoading}}">
+            📱 一键获取微信手机号
+          </button>
+          <view class="phone-tip" wx:if="{{phoneTip}}">{{phoneTip}}</view>
+          <view class="phone-or">或手动输入名单</view>
+          <input class="input" type="number" maxlength="20" placeholder="请输入名单（手机号）"
+                 value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
+          <button class="validate-btn"
+                  bindtap="onValidateWhitelistTap"
+                  loading="{{phoneLoading}}" disabled="{{phoneLoading || !answers[q.id]}}">
+            ✅ 校验名单并加载问卷
+          </button>
+        </view>
+      </block>
+    </view>
+  </block>
+  <block wx:if="{{project && !(project.survey && project.survey.children && project.survey.children[0] && project.survey.children[0].id === 'whitelistName')}}">
     <!-- 顶部进度卡片：题数/已答统计 + 进度条（Remark 等展示型题型不计入） -->
     <view class="card progress-card">
       <view class="survey-meta">
@@ -47,7 +77,7 @@
     <image wx:if="{{headerImageUrl}}" class="header-img" src="{{headerImageUrl}}" mode="widthFix" />
 
     <!-- 问卷标题/说明（可能是 quill 富文本 HTML，含标签时走 rich-text 渲染） -->
-    <view class="card">
+    <view wx:if="{{project.survey.children && project.survey.children[0] && project.survey.children[0].id !== 'whitelistName'}}" class="card">
       <view class="survey-title">
         <rich-text wx:if="{{helper.isHtml(project.survey.title)}}" nodes="{{helper.richNodes(project.survey.title)}}"></rich-text>
         <text wx:else>{{project.survey.title || project.name || '未命名问卷'}}</text>
@@ -60,7 +90,8 @@
 
     <!-- 题目列表 -->
     <view id="q-{{q.id}}" class="card question {{errors[q.id] ? 'has-error' : ''}}"
-          wx:for="{{questions}}" wx:key="id" wx:for-item="q" wx:for-index="qi">
+          wx:for="{{questions}}" wx:key="id" wx:for-item="q" wx:for-index="qi"
+          wx:if="{{q._display !== 'hidden'}}">
       <!-- Remark 文字描述只展示富文本正文：不显示序号/标题行 -->
       <view class="q-title" wx:if="{{q.type !== 'Remark'}}">
         <text class="q-index" wx:if="{{project.setting.answerSetting.questionNumber !== false && q.qNo}}">{{q.qNo}}.</text>
@@ -114,7 +145,7 @@
           <view class="phone-or">或手动输入名单</view>
           <input class="input" type="number" maxlength="20" placeholder="请输入名单（手机号）"
                  value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
-          <button class="validate-btn" size="mini"
+          <button class="validate-btn"
                   bindtap="onValidateWhitelistTap"
                   loading="{{phoneLoading}}" disabled="{{phoneLoading || !answers[q.id]}}">
             ✅ 校验名单并加载问卷
@@ -484,5 +515,4 @@
       <view class="code">{{submitResultText}}</view>
     </view>
   </block>
-
 </view>

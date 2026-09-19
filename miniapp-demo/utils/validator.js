@@ -1,6 +1,8 @@
 // utils/validator.js
 // 表单验证工具，参考 SurveyKing 前端产物的校验规则
 
+const formula = require('./formula.js');
+
 /**
  * 中国大陆身份证号校验（含校验位）
  */
@@ -133,14 +135,21 @@ function validateByDataType(value, dataType, opts = {}) {
  * 校验一道题
  * @param {Object} question - 题目 schema
  * @param {*} value - 用户答案
+ * @param {Object} [formulaCtx] - 可选公式上下文
  * @returns {String|null} 错误消息
  */
-function validateQuestion(question, value) {
+function validateQuestion(question, value, formulaCtx) {
   const attr = question.attribute || {};
   const type = question.type;
 
   // 展示型题型（Remark 文字描述/分割线/分页等）无作答值，跳过校验
   if (type === 'Remark' || type === 'SplitLine' || type === 'Section' || type === 'Pagination') return null;
+
+  // 处于公式隐藏状态的题目跳过校验
+  if (attr.visibleRule && formulaCtx) {
+    const isVisible = formula.evaluateVisibleRule(attr.visibleRule, formulaCtx);
+    if (!isVisible) return null;
+  }
 
   // 必填
   if (attr.required && isEmpty(value)) {
@@ -255,25 +264,58 @@ function validateQuestion(question, value) {
     }
 
     default:
-      return null;
+      break;
   }
+
+  // 4. 单题如果配置了 validateRule 且传入了 formulaCtx，进行公式校验
+  if (attr.validateRule && formulaCtx) {
+    const ruleRes = formula.evaluateValidateRule(attr.validateRule, formulaCtx);
+    if (!ruleRes.valid) {
+      return ruleRes.message || '输入内容不符合限制规则';
+    }
+  }
+
+  return null;
 }
 
 /**
- * 批量校验整个问卷
- * @returns {Object} { valid: bool, errors: {qid: msg}, firstErrorQid: 'xxx' }
+ * 校验一道题
+ * @param {Object} question - 题目 schema
+ * @param {*} value - 用户答案
+ * @param {Object} [formulaCtx] - 可选公式上下文
+ * @returns {String|null} 错误消息
  */
-function validateAll(questions, answers) {
+function validateAll(questions, answers, ctx) {
+  const formulaCtx = ctx || formula.buildVariableContext(questions, answers);
   const errors = {};
   let firstErrorQid = null;
+
   questions.forEach(q => {
-    // 跳过不支持渲染的题型（用户没答也不报错）
-    const err = validateQuestion(q, answers[q.id]);
+    // 1. 若配置了 visibleRule 且当前处于隐藏状态，跳过校验
+    const attr = q.attribute || {};
+    if (attr.visibleRule) {
+      const isVisible = formula.evaluateVisibleRule(attr.visibleRule, formulaCtx);
+      if (!isVisible) return;
+    }
+
+    // 2. 基础题型及数据类型、必填、单题 validateRule 校验
+    const err = validateQuestion(q, answers[q.id], formulaCtx);
     if (err) {
       errors[q.id] = err;
       if (!firstErrorQid) firstErrorQid = q.id;
+      return;
+    }
+
+    // 3. 兜底 validateRule 校验（防止未答题目如 Q1 虽未填写特定内容但违反全局逻辑）
+    if (attr.validateRule) {
+      const ruleRes = formula.evaluateValidateRule(attr.validateRule, formulaCtx);
+      if (!ruleRes.valid) {
+        errors[q.id] = ruleRes.message || '输入内容不符合限制规则';
+        if (!firstErrorQid) firstErrorQid = q.id;
+      }
     }
   });
+
   return {
     valid: Object.keys(errors).length === 0,
     errors,

@@ -1,4 +1,6 @@
 <!--pages/index/index.wxml - 首页：欢迎 + 广告词 + 扫码进入测评 + 演示地址-->
+<wxs src="../../utils/helper.wxs" module="helper" />
+
 <view class="home">
 
   <!-- 欢迎 hero -->
@@ -42,17 +44,17 @@
 
   <!-- 我的测评（本地记录；无记录不显示；每页5条可分页；左滑删除） -->
   <view class="card action-card" wx:if="{{myAll.length}}">
-    <view class="action-title">我的测评</view>
-    <view class="action-desc">我参与过的测评，点击再次进入，左滑可删除</view>
+    <view class="action-title">我参与过的项目</view>
+    <view class="action-desc">我参与过的项目，点击再次进入，左滑可删除</view>
     <view class="demo-list">
       <view class="my-item-wrap" wx:for="{{mySurveys}}" wx:key="shortId">
         <view class="my-del" bindtap="onMySurveyDel" data-shortid="{{item.shortId}}">删除</view>
         <view class="demo-item my-item"
               style="transform: translateX({{offsets[item.shortId] || 0}}px)"
               bindtouchstart="onSwipeStart" bindtouchmove="onSwipeMove" bindtouchend="onSwipeEnd"
-              bindtap="onMySurveyTap" data-shortid="{{item.shortId}}" data-title="{{item.title}}">
+              bindtap="onMySurveyTap" data-shortid="{{item.shortId}}" data-title="{{helper.stripHtml(item.title) || item.title}}">
           <view class="demo-main">
-            <view class="demo-name">{{item.title || '未命名测评'}}</view>
+            <view class="demo-name">{{helper.stripHtml(item.title) || '未命名测评'}}</view>
             <view class="demo-id">ID: {{item.shortId}}<text wx:if="{{item.timeText}}"> · {{item.timeText}}</text></view>
           </view>
           <text class="demo-arrow">›</text>
@@ -68,14 +70,14 @@
   </view>
 
   <!-- 演示地址 -->
-  <view class="card action-card">
-    <view class="action-title">演示测评</view>
-    <view class="action-desc">无需扫码，点击直接体验示例测评问卷</view>
+  <view class="card action-card" style="margin-top: 60px;">
+    <view class="action-title">演示项目</view>
+    <view class="action-desc">以下为演示项目，点击直接体验示例测评问卷</view>
     <view class="demo-list">
       <view class="demo-item" wx:for="{{demos}}" wx:key="shortId"
-            bindtap="onDemoTap" data-shortid="{{item.shortId}}" data-title="{{item.title}}">
+            bindtap="onDemoTap" data-shortid="{{item.shortId}}" data-title="{{helper.stripHtml(item.title) || item.title}}">
         <view class="demo-main">
-          <view class="demo-name">{{item.title}}</view>
+          <view class="demo-name">{{helper.stripHtml(item.title) || item.title}}</view>
           <view class="demo-id">ID: {{item.shortId}}</view>
         </view>
         <text class="demo-arrow">›</text>
