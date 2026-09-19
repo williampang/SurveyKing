@@ -1,0 +1,87 @@
+<!--pages/index/index.wxml - 首页：欢迎 + 广告词 + 扫码进入测评 + 演示地址-->
+<view class="home">
+
+  <!-- 欢迎 hero -->
+  <view class="home-hero">
+    <view class="home-logo">🗳️</view>
+    <view class="home-title">欢迎使用怀宇问卷测评选举</view>
+    <view class="home-slogan">专业 · 经验丰富 · 值得信赖</view>
+  </view>
+
+  <!-- 广告词 -->
+  <view class="card ad-card">
+    <view class="ad-item">
+      <text class="ad-icon">🏆</text>
+      <view class="ad-text">
+        <view class="ad-head">专业团队，经验丰富</view>
+        <view class="ad-desc">多年测评选举系统实施经验，服务众多政企客户</view>
+      </view>
+    </view>
+    <view class="ad-item">
+      <text class="ad-icon">🔒</text>
+      <view class="ad-text">
+        <view class="ad-head">在线不记名 / 记名</view>
+        <view class="ad-desc">支持匿名与实名两种模式，数据安全可控</view>
+      </view>
+    </view>
+    <view class="ad-item">
+      <text class="ad-icon">🛠️</text>
+      <view class="ad-text">
+        <view class="ad-head">现场人员技术支持</view>
+        <view class="ad-desc">可提供驻场技术支持，保障测评选举顺利进行</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 扫码进入测评 -->
+  <view class="card action-card">
+    <view class="action-title">扫码进入测评</view>
+    <view class="action-desc">扫描测评二维码，自动识别测评 ID 并进入。</view>
+    <button class="scan-enter-btn" bindtap="onScanEnter">📷 扫二维码进入测评</button>
+  </view>
+
+  <!-- 我的测评（本地记录；无记录不显示；每页5条可分页；左滑删除） -->
+  <view class="card action-card" wx:if="{{myAll.length}}">
+    <view class="action-title">我的测评</view>
+    <view class="action-desc">我参与过的测评，点击再次进入，左滑可删除</view>
+    <view class="demo-list">
+      <view class="my-item-wrap" wx:for="{{mySurveys}}" wx:key="shortId">
+        <view class="my-del" bindtap="onMySurveyDel" data-shortid="{{item.shortId}}">删除</view>
+        <view class="demo-item my-item"
+              style="transform: translateX({{offsets[item.shortId] || 0}}px)"
+              bindtouchstart="onSwipeStart" bindtouchmove="onSwipeMove" bindtouchend="onSwipeEnd"
+              bindtap="onMySurveyTap" data-shortid="{{item.shortId}}" data-title="{{item.title}}">
+          <view class="demo-main">
+            <view class="demo-name">{{item.title || '未命名测评'}}</view>
+            <view class="demo-id">ID: {{item.shortId}}<text wx:if="{{item.timeText}}"> · {{item.timeText}}</text></view>
+          </view>
+          <text class="demo-arrow">›</text>
+        </view>
+      </view>
+    </view>
+    <!-- 分页（超过5条时显示） -->
+    <view class="my-pager" wx:if="{{myTotalPages > 1}}">
+      <view class="my-pager-btn {{myPage === 0 ? 'disabled' : ''}}" bindtap="onMyPrev">‹ 上一页</view>
+      <view class="my-pager-info">{{myPage + 1}} / {{myTotalPages}}</view>
+      <view class="my-pager-btn {{myPage >= myTotalPages - 1 ? 'disabled' : ''}}" bindtap="onMyNext">下一页 ›</view>
+    </view>
+  </view>
+
+  <!-- 演示地址 -->
+  <view class="card action-card">
+    <view class="action-title">演示测评</view>
+    <view class="action-desc">无需扫码，点击直接体验示例测评问卷</view>
+    <view class="demo-list">
+      <view class="demo-item" wx:for="{{demos}}" wx:key="shortId"
+            bindtap="onDemoTap" data-shortid="{{item.shortId}}" data-title="{{item.title}}">
+        <view class="demo-main">
+          <view class="demo-name">{{item.title}}</view>
+          <view class="demo-id">ID: {{item.shortId}}</view>
+        </view>
+        <text class="demo-arrow">›</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="home-footer">怀宇问卷测评选举 · 专业版</view>
+</view>

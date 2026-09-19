@@ -1,0 +1,488 @@
+<!--pages/survey/survey.wxml - 测评页：承接问卷主体渲染 + 提交校验（shortId 由首页扫码/演示跳转带入）-->
+<wxs src="../../utils/helper.wxs" module="helper" />
+
+<view class="container">
+
+  <!-- 顶部工具条：测评ID + 重新加载 -->
+  <view class="survey-toolbar">
+    <text class="toolbar-id">测评 ID：{{shortId}}</text>
+    <button class="toolbar-reload" size="mini" bindtap="loadAndShow" loading="{{loading}}" disabled="{{loading}}">↻ 重新加载</button>
+  </view>
+
+  <!-- 上次提交结果提示（本地回填；后端无公开查询接口） -->
+  <view class="card last-submit-card" wx:if="{{lastSubmit}}">
+    <view class="last-submit-title">📄 已载入上次提交结果</view>
+    <view class="last-submit-time" wx:if="{{lastSubmit.timeText}}">提交时间：{{lastSubmit.timeText}}</view>
+    <view class="last-submit-desc">以下为上次提交的答案，可修改后重新提交</view>
+    <button class="last-submit-clear" size="mini" bindtap="onClearRefill">🗑 清空重填</button>
+  </view>
+
+  <!-- 状态提示 -->
+  <view class="card status-card" wx:if="{{status}}">
+    <view class="status-{{statusType}}">{{status}}</view>
+  </view>
+
+  <!-- 错误详情 + 重试 -->
+  <view class="card" wx:if="{{error}}">
+    <view class="err-title">❌ 出错了</view>
+    <view class="code">{{error}}</view>
+    <button class="toolbar-reload" size="mini" bindtap="loadAndShow">↻ 重试</button>
+  </view>
+
+  <!-- 问卷主体 -->
+  <block wx:if="{{project}}">
+    <!-- 顶部进度卡片：题数/已答统计 + 进度条（Remark 等展示型题型不计入） -->
+    <view class="card progress-card">
+      <view class="survey-meta">
+        <text>共 {{totalCount}} 题</text>
+        <text wx:if="{{answeredCount}}"> · 已答 {{answeredCount}}</text>
+        <text wx:if="{{project.setting.answerSetting.progressBar}}"> · {{progressPct}}%</text>
+      </view>
+      <view class="progress-bar" wx:if="{{project.setting.answerSetting.progressBar}}">
+        <view class="progress-inner" style="width: {{progressPct}}%"></view>
+      </view>
+    </view>
+
+    <!-- 顶部图片 -->
+    <image wx:if="{{headerImageUrl}}" class="header-img" src="{{headerImageUrl}}" mode="widthFix" />
+
+    <!-- 问卷标题/说明（可能是 quill 富文本 HTML，含标签时走 rich-text 渲染） -->
+    <view class="card">
+      <view class="survey-title">
+        <rich-text wx:if="{{helper.isHtml(project.survey.title)}}" nodes="{{helper.richNodes(project.survey.title)}}"></rich-text>
+        <text wx:else>{{project.survey.title || project.name || '未命名问卷'}}</text>
+      </view>
+      <view class="survey-desc" wx:if="{{project.survey.description}}">
+        <rich-text wx:if="{{helper.isHtml(project.survey.description)}}" nodes="{{helper.richNodes(project.survey.description)}}"></rich-text>
+        <text wx:else>{{project.survey.description}}</text>
+      </view>
+    </view>
+
+    <!-- 题目列表 -->
+    <view id="q-{{q.id}}" class="card question {{errors[q.id] ? 'has-error' : ''}}"
+          wx:for="{{questions}}" wx:key="id" wx:for-item="q" wx:for-index="qi">
+      <!-- Remark 文字描述只展示富文本正文：不显示序号/标题行 -->
+      <view class="q-title" wx:if="{{q.type !== 'Remark'}}">
+        <text class="q-index" wx:if="{{project.setting.answerSetting.questionNumber !== false && q.qNo}}">{{q.qNo}}.</text>
+        <rich-text wx:if="{{helper.isHtml(q.title)}}" class="q-text" nodes="{{helper.richNodes(q.title)}}"></rich-text>
+        <text wx:else class="q-text">{{q.title}}</text>
+        <text class="q-required" wx:if="{{q.attribute.required}}">*</text>
+        <text class="q-type">[{{q.type}}]</text>
+      </view>
+
+      <!-- ============ Radio 单选（adm-selector 胶囊风格）============ -->
+      <view wx:if="{{q.type === 'Radio'}}" class="selector">
+        <view wx:for="{{q.children}}" wx:key="id" wx:for-item="opt"
+              class="selector-item {{answers[q.id] === opt.id ? 'active' : ''}}"
+              bindtap="onRadioTap" data-qid="{{q.id}}" data-val="{{opt.id}}">
+          {{opt.title}}
+        </view>
+      </view>
+
+      <!-- ============ Checkbox 多选（adm-selector 胶囊风格）============ -->
+      <view wx:elif="{{q.type === 'Checkbox'}}" class="selector">
+        <view wx:for="{{q.children}}" wx:key="id" wx:for-item="opt"
+              class="selector-item {{helper.contains(answers[q.id], opt.id) ? 'active' : ''}}"
+              bindtap="onCheckboxTap" data-qid="{{q.id}}" data-val="{{opt.id}}">
+          <text class="selector-check" wx:if="{{helper.contains(answers[q.id], opt.id)}}">✓</text>
+          {{opt.title}}
+        </view>
+      </view>
+
+      <!-- ============ Select 下拉 ============ -->
+      <picker wx:elif="{{q.type === 'Select'}}" mode="selector" range="{{q.children}}" range-key="title"
+              bindchange="onSelectChange" data-qid="{{q.id}}">
+        <view class="picker">
+          <text>{{helper.selectLabel(q, answers[q.id]) || '请选择'}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+
+      <!-- ============ FillBlank 单行填空（helper.fillBlankMode 判定控件，时间格式优先） ============ -->
+      <block wx:elif="{{q.type === 'FillBlank'}}">
+        <!-- 白名单登录字段（后端 whitelistType=4 时自动注入 id=whitelistName）：
+             一键获取微信手机号 → 回填 → POST /api/public/validateProject 校验名单
+             → 后端直接返回真实问卷，本地重新渲染进入正常答卷流程 -->
+        <view wx:if="{{q.id === 'whitelistName'}}" class="whitelist-phone">
+          <button class="phone-btn" open-type="getPhoneNumber"
+                  bindgetphonenumber="onGetPhoneNumber"
+                  data-qid="{{q.id}}"
+                  loading="{{phoneLoading}}" disabled="{{phoneLoading}}">
+            📱 一键获取微信手机号
+          </button>
+          <view class="phone-tip" wx:if="{{phoneTip}}">{{phoneTip}}</view>
+          <view class="phone-or">或手动输入名单</view>
+          <input class="input" type="number" maxlength="20" placeholder="请输入名单（手机号）"
+                 value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
+          <button class="validate-btn" size="mini"
+                  bindtap="onValidateWhitelistTap"
+                  loading="{{phoneLoading}}" disabled="{{phoneLoading || !answers[q.id]}}">
+            ✅ 校验名单并加载问卷
+          </button>
+        </view>
+        <!-- 时间型：dateTimeFormat 为 HH:mm / HH:mm:ss 或 dataType=time（优先于 date） -->
+        <picker wx:elif="{{helper.fillBlankMode(q) === 'time'}}" mode="time"
+                value="{{answers[q.id]}}" bindchange="onTimePick" data-qid="{{q.id}}">
+          <view class="picker">
+            <text>{{answers[q.id] || '请选择时间'}}</text>
+            <text class="picker-arrow">🕐</text>
+          </view>
+        </picker>
+        <!-- 日期型：dataType=date 且无时间格式 -->
+        <picker wx:elif="{{helper.fillBlankMode(q) === 'date'}}" mode="date"
+                value="{{answers[q.id]}}" bindchange="onDatePick" data-qid="{{q.id}}">
+          <view class="picker">
+            <text>{{answers[q.id] || '请选择日期'}}</text>
+            <text class="picker-arrow">📅</text>
+          </view>
+        </picker>
+        <!-- 数字型 -->
+        <input wx:elif="{{helper.fillBlankMode(q) === 'number'}}"
+               class="input" type="digit" placeholder="请输入数字"
+               value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
+        <!-- 手机号 -->
+        <input wx:elif="{{helper.fillBlankMode(q) === 'mobile'}}"
+               class="input" type="number" maxlength="11" placeholder="请输入手机号"
+               value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
+        <!-- 身份证 -->
+        <input wx:elif="{{helper.fillBlankMode(q) === 'idcard'}}"
+               class="input" type="idcard" maxlength="18" placeholder="请输入身份证号"
+               value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
+        <!-- 默认文本 -->
+        <input wx:else class="input" placeholder="请输入"
+               value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
+      </block>
+
+      <!-- ============ Textarea 多行填空 ============ -->
+      <textarea wx:elif="{{q.type === 'Textarea'}}" class="textarea" placeholder="请输入"
+                value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
+
+      <!-- ============ HorzBlank 横向填空（按 children id 收集） ============ -->
+      <view wx:elif="{{q.type === 'HorzBlank'}}" class="horz-blank">
+        <view class="horz-tip" wx:if="{{q.attribute.content}}">
+          {{helper.stripHtml(q.attribute.content)}}
+        </view>
+        <view class="horz-field" wx:for="{{q.children}}" wx:key="id" wx:for-item="f">
+          <text class="horz-label">{{f.title || f.id}}</text>
+          <input class="input horz-input" placeholder="请输入{{f.title || f.id}}"
+                 value="{{answers[q.id][f.id]}}"
+                 bindinput="onHorzBlankInput"
+                 data-qid="{{q.id}}" data-fid="{{f.id}}" />
+        </view>
+      </view>
+
+      <!-- ============ MultipleBlank 多项填空 ============ -->
+      <view wx:elif="{{q.type === 'MultipleBlank'}}" class="multi-blank">
+        <view class="multi-field" wx:for="{{q.children}}" wx:key="id" wx:for-item="f">
+          <text class="multi-label">{{f.title}}</text>
+          <input class="input" placeholder="请输入{{f.title}}"
+                 value="{{answers[q.id][f.id]}}"
+                 bindinput="onHorzBlankInput"
+                 data-qid="{{q.id}}" data-fid="{{f.id}}" />
+        </view>
+      </view>
+
+      <!-- ============ Cascader 级联（左右多列联动：第1列=一级，第2列=二级...）============ -->
+      <view wx:elif="{{q.type === 'Cascader'}}" class="cascader">
+        <block wx:if="{{q.dataSource && q.dataSource.length}}">
+          <scroll-view scroll-x class="cascader-scroll">
+            <view class="cascader-cols">
+              <view class="cascader-col"
+                    wx:for="{{helper.range(0, helper.cascaderDepth(q.dataSource) - 1)}}"
+                    wx:key="*this" wx:for-item="lvl">
+                <view class="cascader-col-title">{{q.children[lvl].title || '第' + (lvl + 1) + '级'}}</view>
+                <scroll-view scroll-y class="cascader-col-list">
+                  <view class="cascader-item {{helper.get(answers[q.id], 'path', [])[lvl] === opt.value ? 'active' : ''}}"
+                        wx:for="{{helper.cascaderOptionsAt(q.dataSource, helper.get(answers[q.id], 'path', []), lvl)}}"
+                        wx:key="value" wx:for-item="opt"
+                        bindtap="onCascaderColTap"
+                        data-qid="{{q.id}}" data-level="{{lvl}}"
+                        data-value="{{opt.value}}" data-label="{{opt.label}}">
+                    {{opt.label}}
+                  </view>
+                  <view class="cascader-empty" wx:if="{{!helper.cascaderOptionsAt(q.dataSource, helper.get(answers[q.id], 'path', []), lvl).length}}">请先选择上一级</view>
+                </scroll-view>
+              </view>
+            </view>
+          </scroll-view>
+          <view class="cascader-result" wx:if="{{helper.get(answers[q.id], 'labels', []).length}}">
+            已选：{{helper.cascaderLabel(q.dataSource, helper.get(answers[q.id], 'path', []))}}
+          </view>
+        </block>
+        <view wx:else class="unsupported-inline">
+          ⚠️ 该级联题没有配置 dataSource，需要在管理后台“字典”里绑定数据
+        </view>
+      </view>
+
+      <!-- ============ Barcode 扫码题 ============ -->
+      <view wx:elif="{{q.type === 'Barcode'}}" class="barcode">
+        <button class="scan-btn" bindtap="onScanCode" data-qid="{{q.id}}">
+          📷 点击扫码
+        </button>
+        <view class="scan-result" wx:if="{{answers[q.id]}}">
+          扫码结果：<text class="code-inline">{{answers[q.id]}}</text>
+        </view>
+      </view>
+
+      <!-- ============ Signature 手写签名 ============ -->
+      <view wx:elif="{{q.type === 'Signature'}}" class="signature">
+        <view class="sig-hint" wx:if="{{!answers[q.id]}}">✍️ 请在下方区域手写签名</view>
+        <view class="sig-canvas-wrap">
+          <!-- canvas 2d：iOS 真机对旧版 canvas-id + draw(true) 兼容差，改用 type="2d" -->
+          <canvas type="2d" id="sig-{{q.id}}" class="sig-canvas"
+                  disable-scroll="true"
+                  bindtouchstart="onSigTouchStart"
+                  bindtouchmove="onSigTouchMove"
+                  bindtouchend="onSigTouchEnd"
+                  data-qid="{{q.id}}"></canvas>
+        </view>
+        <view class="sig-actions">
+          <button class="sig-btn" size="mini" bindtap="onSigClear" data-qid="{{q.id}}">↻ 重写</button>
+          <button class="sig-btn primary" size="mini" bindtap="onSigConfirm" data-qid="{{q.id}}" disabled="{{!sigHasStroke[q.id]}}">✓ 确认签名</button>
+        </view>
+        <view class="sig-preview" wx:if="{{answers[q.id]}}">
+          <image class="sig-img" src="{{answers[q.id]}}" mode="aspectFit" />
+          <text class="sig-ok">✓ 已签名</text>
+        </view>
+      </view>
+
+      <!-- ============ Address 所在位置（type=Address，配置 mapMove 控制能否拖动地图改定位）============ -->
+      <view wx:elif="{{q.type === 'Address'}}" class="location">
+        <button class="loc-btn" bindtap="onGetLocation" data-qid="{{q.id}}" loading="{{locLoading[q.id]}}">
+          📍 {{answers[q.id] ? '重新获取位置' : '点击获取当前位置'}}
+        </button>
+        <view class="loc-result" wx:if="{{answers[q.id]}}">
+          <view class="loc-addr">{{answers[q.id].address || answers[q.id].name || '仅获取到坐标（文字地址未解析）'}}</view>
+          <view class="loc-geo-err" wx:if="{{answers[q.id].geoError}}">⚠️ 地址解析失败：{{answers[q.id].geoError}}</view>
+          <view class="loc-coord">经度 {{answers[q.id].longitude}} · 纬度 {{answers[q.id].latitude}}</view>
+          <view class="loc-map-wrap" wx:if="{{answers[q.id].latitude}}">
+            <map class="loc-map" id="map-{{q.id}}"
+                 latitude="{{answers[q.id].latitude}}"
+                 longitude="{{answers[q.id].longitude}}"
+                 markers="{{[{id:1, latitude:answers[q.id].latitude, longitude:answers[q.id].longitude, width:24, height:24}]}}"
+                 scale="15"
+                 bindregionchange="onMapRegionChange"
+                 data-qid="{{q.id}}"></map>
+            <!-- mapMove=true 才可拖动改定位；缺省/false 拖动仅查看、不重新获取地址 -->
+            <view class="loc-move-tip" wx:if="{{helper.mapMove(q)}}">↔ 可拖动地图微调定位点</view>
+            <view class="loc-move-tip off" wx:else>🔒 定位已固定，拖动地图仅查看，不会修改位置</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- ============ Score 评分（3 种样式：star★ / heart♥ / smile表情）============ -->
+      <view wx:elif="{{q.type === 'Score'}}" class="rate rate-{{helper.scoreStyle(q)}}">
+        <view wx:for="{{helper.range(1, helper.scoreMax(q))}}" wx:key="*this" wx:for-item="n"
+              class="rate-star {{answers[q.id] >= n ? 'on' : 'off'}}"
+              bindtap="onScoreTap" data-qid="{{q.id}}" data-val="{{n}}">
+          {{helper.scoreIcon(q, n)}}
+        </view>
+        <text class="rate-value" wx:if="{{answers[q.id]}}">{{answers[q.id]}} / {{helper.scoreMax(q)}}</text>
+      </view>
+
+      <!-- ============ Nps (0-10) 两端标签“不可能 / 极有可能”============ -->
+      <view wx:elif="{{q.type === 'Nps'}}" class="nps">
+        <view class="nps-row">
+          <view wx:for="{{helper.range(0, 10)}}" wx:key="*this" wx:for-item="n"
+                class="nps-item {{answers[q.id] === n ? 'active' : ''}}"
+                bindtap="onScoreTap" data-qid="{{q.id}}" data-val="{{n}}">
+            {{n}}
+          </view>
+        </view>
+        <view class="nps-legend">
+          <text class="nps-legend-left">不可能</text>
+          <text class="nps-legend-right">极有可能</text>
+        </view>
+      </view>
+
+      <!-- ============ MatrixRadio 矩阵单选（matrixStyle 配置：table 表格 / chips 胶囊，默认 chips） ============ -->
+      <view wx:elif="{{q.type === 'MatrixRadio'}}" class="matrix">
+        <!-- 表格样式：弹性列宽铺满屏宽，不横向滚动 -->
+        <view wx:if="{{matrixStyle === 'table'}}" class="matrix-table">
+          <view class="matrix-row matrix-head">
+            <view class="matrix-cell matrix-row-label"></view>
+            <view class="matrix-cell" wx:for="{{q.children}}" wx:key="id" wx:for-item="col">{{col.title}}</view>
+          </view>
+          <view class="matrix-row" wx:for="{{q.row}}" wx:key="id" wx:for-item="r">
+            <view class="matrix-cell matrix-row-label">{{r.title}}</view>
+            <view class="matrix-cell" wx:for="{{q.children}}" wx:key="id" wx:for-item="col">
+              <radio class="matrix-radio" color="#1890ff"
+                     checked="{{helper.matrixVal(answers, q.id, r.id) === col.id}}"
+                     bindtap="onMatrixRadioTap"
+                     data-qid="{{q.id}}" data-rowid="{{r.id}}" data-colid="{{col.id}}" />
+            </view>
+          </view>
+        </view>
+        <!-- 胶囊样式（默认，对齐手机浏览器 H5）：每行一行名 + 选项胶囊，选中带右下角角标 -->
+        <view wx:else class="matrix-chips">
+          <view class="matrix-chip-group" wx:for="{{q.row}}" wx:key="id" wx:for-item="r">
+            <view class="matrix-chip-title">{{r.title}}</view>
+            <view class="selector">
+              <view wx:for="{{q.children}}" wx:key="id" wx:for-item="col"
+                    class="selector-item matrix-chip {{helper.matrixVal(answers, q.id, r.id) === col.id ? 'active' : ''}}"
+                    bindtap="onMatrixRadioTap"
+                    data-qid="{{q.id}}" data-rowid="{{r.id}}" data-colid="{{col.id}}">
+                {{col.title}}
+                <text class="matrix-chip-check" wx:if="{{helper.matrixVal(answers, q.id, r.id) === col.id}}">✓</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- ============ MatrixCheckbox 矩阵多选（matrixStyle 配置：table 表格 / chips 胶囊，默认 chips） ============ -->
+      <view wx:elif="{{q.type === 'MatrixCheckbox'}}" class="matrix">
+        <!-- 表格样式：弹性列宽铺满屏宽，不横向滚动 -->
+        <view wx:if="{{matrixStyle === 'table'}}" class="matrix-table">
+          <view class="matrix-row matrix-head">
+            <view class="matrix-cell matrix-row-label"></view>
+            <view class="matrix-cell" wx:for="{{q.children}}" wx:key="id" wx:for-item="col">{{col.title}}</view>
+          </view>
+          <view class="matrix-row" wx:for="{{q.row}}" wx:key="id" wx:for-item="r">
+            <view class="matrix-cell matrix-row-label">{{r.title}}</view>
+            <view class="matrix-cell" wx:for="{{q.children}}" wx:key="id" wx:for-item="col">
+              <checkbox class="matrix-checkbox" color="#1890ff"
+                        checked="{{helper.matrixChecked(answers, q.id, r.id, col.id)}}"
+                        bindtap="onMatrixCheckboxTap"
+                        data-qid="{{q.id}}" data-rowid="{{r.id}}" data-colid="{{col.id}}" />
+            </view>
+          </view>
+        </view>
+        <!-- 胶囊样式（默认，对齐手机浏览器 H5）：每行一行名 + 选项胶囊，选中带右下角角标 -->
+        <view wx:else class="matrix-chips">
+          <view class="matrix-chip-group" wx:for="{{q.row}}" wx:key="id" wx:for-item="r">
+            <view class="matrix-chip-title">{{r.title}}</view>
+            <view class="selector">
+              <view wx:for="{{q.children}}" wx:key="id" wx:for-item="col"
+                    class="selector-item matrix-chip {{helper.matrixChecked(answers, q.id, r.id, col.id) ? 'active' : ''}}"
+                    bindtap="onMatrixCheckboxTap"
+                    data-qid="{{q.id}}" data-rowid="{{r.id}}" data-colid="{{col.id}}">
+                {{col.title}}
+                <text class="matrix-chip-check" wx:if="{{helper.matrixChecked(answers, q.id, r.id, col.id)}}">✓</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- ============ MatrixFillBlank 矩阵填空 ============ -->
+      <view wx:elif="{{q.type === 'MatrixFillBlank'}}" class="matrix">
+        <!-- 单列填空：对齐 H5 的两列表格样式（表头 + 左行名 + 右输入框），比逐行堆叠清晰 -->
+        <view wx:if="{{q.children.length === 1}}" class="matrix-table matrix-fill-table">
+          <view class="matrix-row matrix-head">
+            <view class="matrix-cell matrix-row-label">行号</view>
+            <view class="matrix-cell">{{q.children[0].title}}</view>
+          </view>
+          <view class="matrix-row" wx:for="{{q.row}}" wx:key="id" wx:for-item="r">
+            <view class="matrix-cell matrix-row-label">{{r.title}}</view>
+            <view class="matrix-cell">
+              <input class="input matrix-fill-input" placeholder="请输入"
+                     value="{{helper.matrixVal(answers, q.id, r.id)[q.children[0].id]}}"
+                     bindinput="onMatrixFillInput"
+                     data-qid="{{q.id}}" data-rowid="{{r.id}}" data-colid="{{q.children[0].id}}" />
+            </view>
+          </view>
+        </view>
+        <!-- 多列：保持逐行分组布局 -->
+        <block wx:else>
+          <view class="matrix-fill-row" wx:for="{{q.row}}" wx:key="id" wx:for-item="r">
+            <view class="matrix-fill-label">{{r.title}}</view>
+            <view class="matrix-fill-cells">
+              <view class="matrix-fill-cell" wx:for="{{q.children}}" wx:key="id" wx:for-item="col">
+                <text class="matrix-col-title">{{col.title}}</text>
+                <input class="input" placeholder="请输入"
+                       value="{{helper.matrixVal(answers, q.id, r.id)[col.id]}}"
+                       bindinput="onMatrixFillInput"
+                       data-qid="{{q.id}}" data-rowid="{{r.id}}" data-colid="{{col.id}}" />
+              </view>
+            </view>
+          </view>
+        </block>
+      </view>
+
+      <!-- ============ MatrixAuto 自增表格（对齐 H5 前台表格布局：表头 + 数据行 + 继续填写） ============ -->
+      <view wx:elif="{{q.type === 'MatrixAuto'}}" class="matrix-auto">
+        <view class="auto-table">
+          <!-- 表头：列名 + 删除列占位 -->
+          <view class="auto-tr auto-thead">
+            <view class="auto-th" wx:for="{{q.children}}" wx:key="id" wx:for-item="col">{{col.title}}</view>
+            <view class="auto-th auto-th-del"></view>
+          </view>
+          <!-- 数据行：每列一个控件，行尾 ⊗ 删除 -->
+          <view class="auto-tr" wx:for="{{answers[q.id] || []}}" wx:key="index" wx:for-item="row" wx:for-index="ri">
+            <view class="auto-td" wx:for="{{q.children}}" wx:key="id" wx:for-item="col">
+              <input wx:if="{{col.attribute.dataType !== 'select'}}" class="input auto-input" placeholder="请输入"
+                     value="{{row[col.id]}}"
+                     bindinput="onAutoCellInput"
+                     data-qid="{{q.id}}" data-idx="{{ri}}" data-colid="{{col.id}}" />
+              <!-- 下拉列：dataSource 存 [{label, value}]，选中后存 value（后端按 value 反查 label） -->
+              <picker wx:elif="{{col.dataSource && col.dataSource.length}}" mode="selector"
+                      range="{{col.dataSource}}" range-key="label"
+                      bindchange="onAutoCellSelect"
+                      data-qid="{{q.id}}" data-idx="{{ri}}" data-colid="{{col.id}}">
+                <view class="auto-select">
+                  <text class="auto-select-text {{row[col.id] ? '' : 'ph'}}">{{helper.autoSelectLabel(col, row[col.id]) || '请选择'}}</text>
+                  <text class="auto-select-arrow">⌄</text>
+                </view>
+              </picker>
+              <!-- 无 dataSource 的下拉列降级为文本输入 -->
+              <input wx:else class="input auto-input" placeholder="请输入"
+                     value="{{row[col.id]}}"
+                     bindinput="onAutoCellInput"
+                     data-qid="{{q.id}}" data-idx="{{ri}}" data-colid="{{col.id}}" />
+            </view>
+            <view class="auto-td auto-td-del">
+              <text class="auto-del-btn" bindtap="onAutoRowDel" data-qid="{{q.id}}" data-idx="{{ri}}">⊗</text>
+            </view>
+          </view>
+          <!-- 表尾：+ 继续填写 -->
+          <view class="auto-tr auto-tfoot">
+            <view class="auto-add" bindtap="onAutoRowAdd" data-qid="{{q.id}}">+ 继续填写</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- ============ User 成员 / Dept 部门（需要登录，MVP 用文本代替） ============ -->
+      <view wx:elif="{{q.type === 'User' || q.type === 'Dept'}}" class="user-dept">
+        <input class="input" placeholder="请输入{{q.type === 'User' ? '成员' : '部门'}}名称（MVP 简化）"
+               value="{{answers[q.id]}}" bindinput="onTextInput" data-qid="{{q.id}}" />
+        <view class="user-dept-tip">
+          ⚠️ 完整功能需要登录 + 调 /api/system/user/list 或 /api/system/dept/list
+        </view>
+      </view>
+
+      <!-- ============ Remark 文字描述（仅展示富文本：无序号、无作答控件、不计入校验） ============ -->
+      <view wx:elif="{{q.type === 'Remark'}}" class="remark">
+        <rich-text wx:if="{{helper.isHtml(q.title)}}" nodes="{{helper.richNodes(q.title)}}"></rich-text>
+        <view wx:else>{{q.title}}</view>
+      </view>
+
+      <!-- ============ 其他未支持的题型 ============ -->
+      <view wx:else class="unsupported">
+        ⚠️ 题型 [{{q.type}}] MVP 未实现
+      </view>
+
+      <!-- 单题错误提示 -->
+      <view class="q-error" wx:if="{{errors[q.id]}}">
+        {{errors[q.id]}}
+      </view>
+    </view>
+
+    <!-- 提交按钮（白名单登录表单模式下隐藏，需先校验名单拿到真实问卷） -->
+    <view class="card submit-card" wx:if="{{!whitelistOnly}}">
+      <button class="big-btn submit" bindtap="submit" loading="{{submitting}}" disabled="{{submitting}}">
+        ✅ {{project.survey.attribute.submitButton || '提交答卷'}} ({{answeredCount}} / {{totalCount}})
+      </button>
+      <view class="submit-tip" wx:if="{{project.survey.attribute.suffix}}">
+        {{project.survey.attribute.suffix}}
+      </view>
+    </view>
+
+    <!-- 提交结果 -->
+    <view class="card" wx:if="{{submitResult}}">
+      <view class="ok-title">🎉 提交成功</view>
+      <view class="code">{{submitResultText}}</view>
+    </view>
+  </block>
+
+</view>

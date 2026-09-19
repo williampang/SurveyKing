@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>首页 - 卷王问卷考试系统</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="./index.html"><img src="../../server/api/src/main/resources/static/logo.svg" alt="" /><span id="brand-name">卷王问卷考试系统</span></a>
+        <nav class="nav-list" aria-label="主导航">
+          <a class="nav-item active" href="./index.html">⌂ <span>首页</span></a>
+          <a class="nav-item" href="/project">▣ <span>我的项目</span></a>
+          <a class="nav-item" href="/exercise">✎ <span>我的练习</span></a>
+          <a class="nav-item" href="/repo">▤ <span>题库中心</span></a>
+          <a class="nav-item" href="/template">▧ <span>模板广场</span></a>
+          <a class="nav-item" href="/system/user">⚙ <span>系统管理</span></a>
+        </nav>
+        <p class="sidebar-note">SurveyKing<br />问卷与考试工作台</p>
+      </aside>
+
+      <div class="main-shell">
+        <header class="topbar">
+          <div class="mobile-brand"><img src="../../server/api/src/main/resources/static/logo.svg" alt="" /> <span id="mobile-brand-name">卷王问卷考试系统</span></div>
+          <div class="top-actions"><button class="icon-button" type="button" aria-label="帮助">?</button><button class="icon-button" type="button" aria-label="语言">文</button><span class="account" id="account-name">Admin</span><button class="logout-button" id="logout-button" type="button">退出</button></div>
+        </header>
+
+        <main class="content">
+          <div class="breadcrumb">首页 <span>/</span> <strong>首页</strong></div>
+          <section class="welcome-panel">
+            <div><p class="eyebrow">TODAY AT A GLANCE</p><h1>晚上好，<span id="welcome-name">Admin</span></h1><p id="system-description">把问卷、考试和题库，集中在一个工作台里。</p></div>
+            <div class="metrics"><div><span>问卷数</span><strong id="survey-count">--</strong></div><div><span>考试数</span><strong id="exam-count">--</strong></div></div>
+          </section>
+
+          <section class="workspace-section">
+            <div class="tabs" role="tablist">
+              <button class="tab active" type="button" data-type="exam" role="tab">我的考试</button>
+              <button class="tab" type="button" data-type="survey" role="tab">我的问卷</button>
+              <button class="tab" type="button" data-type="answer" role="tab">问卷记录</button>
+              <button class="tab" type="button" data-type="history" role="tab">考试记录</button>
+            </div>
+            <div class="table-tools"><button id="refresh-button" type="button">↻ 刷新</button></div>
+            <div class="table-wrap"><table><thead><tr><th>名称</th><th>开始时间</th><th>完成状态</th><th>操作</th></tr></thead><tbody id="task-body"><tr><td colspan="4" class="empty">加载中...</td></tr></tbody></table></div>
+          </section>
+
+          <section class="quick-section"><div><p class="eyebrow">START SOMETHING NEW</p><h2>快速开始</h2><p>从一个清晰的起点开始你的下一份内容。</p></div><div class="quick-actions"><a href="/survey/new?mode=survey"><span>＋</span><strong>创建问卷</strong><small>收集反馈与数据</small></a><a href="/survey/new?mode=exam"><span>＋</span><strong>创建考试</strong><small>组织练习与测验</small></a></div></section>
+        </main>
+      </div>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

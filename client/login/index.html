@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="卷王问卷考试系统登录" />
+    <title>登录 - 卷王问卷考试系统</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="login-shell">
+      <section class="brand-panel" aria-label="产品介绍">
+        <div class="brand-header">
+          <img class="brand-logo" src="../../server/api/src/main/resources/static/logo.svg" alt="" />
+          <span id="brand-name">卷王问卷考试系统</span>
+        </div>
+        <div class="brand-copy">
+          <p class="eyebrow">SURVEYKING</p>
+          <h1>让问卷与考试<br />更简单高效</h1>
+          <p id="brand-description" class="brand-description">创建问卷、组织考试、管理题库，并在一个工作台中掌握完整数据。</p>
+        </div>
+        <p class="brand-footer">SurveyKing · 自托管问卷与考试平台</p>
+      </section>
+
+      <section class="form-panel">
+        <div class="form-card">
+          <div class="form-heading">
+            <p class="eyebrow">WELCOME BACK</p>
+            <h2>登录</h2>
+            <p>登录后继续管理你的问卷和考试。</p>
+          </div>
+
+          <form id="login-form" novalidate>
+            <label class="field">
+              <span>用户名</span>
+              <input id="username" name="username" autocomplete="username" required autofocus />
+            </label>
+            <label class="field">
+              <span>密码</span>
+              <input id="password" name="password" type="password" autocomplete="current-password" required />
+            </label>
+            <p id="login-message" class="message" role="alert" aria-live="polite"></p>
+            <button id="submit-button" type="submit">登录</button>
+          </form>
+
+          <p id="register-prompt" class="form-footer" hidden>还没有账号？<a href="/user/register">立即注册</a></p>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

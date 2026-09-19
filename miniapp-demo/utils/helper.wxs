@@ -1,0 +1,287 @@
+// utils/helper.wxs
+// WXML 辅助函数：WXML 里无法直接调用 Page 方法，必须用 wxs
+
+/**
+ * 下拉/单选：根据 val 找 label
+ */
+function selectLabel(q, val) {
+  if (!val || !q || !q.children) return '';
+  for (var i = 0; i < q.children.length; i++) {
+    if (q.children[i].id === val) return q.children[i].title;
+  }
+  return '';
+}
+
+/**
+ * 数组包含
+ */
+function contains(arr, val) {
+  if (!arr || !arr.length) return false;
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i] === val) return true;
+  }
+  return false;
+}
+
+/**
+ * 生成 [start, ..., end] 数组
+ */
+function range(start, end) {
+  var arr = [];
+  for (var i = start; i <= end; i++) arr.push(i);
+  return arr;
+}
+
+/**
+ * 安全取对象字段（避免 wxml 里 a.b.c 空指针）
+ */
+function get(obj, key, def) {
+  if (!obj) return def === undefined ? '' : def;
+  var v = obj[key];
+  return v === undefined || v === null ? (def === undefined ? '' : def) : v;
+}
+
+/**
+ * 级联题：从 dataSource 中根据已选值数组，返回下一级的选项列表
+ * @param dataSource 完整树形数据
+ * @param path 已选中的 value 数组，例如 ['110000', '110100']
+ */
+function cascaderOptions(dataSource, path) {
+  if (!dataSource || !dataSource.length) return [];
+  var list = dataSource;
+  if (!path || !path.length) return list;
+  for (var i = 0; i < path.length; i++) {
+    var found = null;
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].value === path[i]) { found = list[j]; break; }
+    }
+    if (!found || !found.children) return [];
+    list = found.children;
+  }
+  return list;
+}
+
+/**
+ * 级联题：根据已选值数组返回 label 路径字符串
+ */
+function cascaderLabel(dataSource, path) {
+  if (!dataSource || !path || !path.length) return '';
+  var labels = [];
+  var list = dataSource;
+  for (var i = 0; i < path.length; i++) {
+    var found = null;
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].value === path[i]) { found = list[j]; break; }
+    }
+    if (!found) break;
+    labels.push(found.label);
+    if (!found.children) break;
+    list = found.children;
+  }
+  return labels.join(' / ');
+}
+
+/**
+ * 级联题：层级数（探测 dataSource 深度）
+ */
+function cascaderDepth(dataSource) {
+  if (!dataSource || !dataSource.length) return 0;
+  var depth = 1;
+  var cur = dataSource[0];
+  while (cur && cur.children && cur.children.length) {
+    depth++;
+    cur = cur.children[0];
+  }
+  return depth;
+}
+
+/**
+ * 矩阵题：安全取 answers[qid][rowId]
+ */
+function matrixVal(answers, qid, rowId) {
+  if (!answers || !answers[qid]) return '';
+  var v = answers[qid][rowId];
+  return v === undefined || v === null ? '' : v;
+}
+
+/**
+ * 矩阵多选：安全判断某行某列是否勾选
+ */
+function matrixChecked(answers, qid, rowId, colId) {
+  if (!answers || !answers[qid]) return false;
+  var arr = answers[qid][rowId];
+  if (!arr || !arr.length) return false;
+  for (var i = 0; i < arr.length; i++) if (arr[i] === colId) return true;
+  return false;
+}
+
+/**
+ * HorzBlank：从 HTML content 中抽取纯文本（简单去标签，用于展示）
+ * 注意：WXS 不支持正则字面量 /.../，必须用 getRegExp()
+ */
+function stripHtml(html) {
+  if (!html) return '';
+  var tagReg = getRegExp('<[^>]+>', 'g');
+  var spaceReg = getRegExp('\\s+', 'g');
+  return html.replace(tagReg, ' ').replace(spaceReg, ' ').trim();
+}
+
+/**
+ * 生成 n 个空对象的数组（MatrixAuto 初始化用）
+ */
+function emptyRows(n) {
+  var arr = [];
+  for (var i = 0; i < n; i++) arr.push(i);
+  return arr;
+}
+
+/**
+ * Score 题：最大星数
+ * H5 用 ant-rate，默认 5 颗星；如果 attribute.maxScore 存在则用它
+ */
+function scoreMax(q) {
+  if (!q) return 5;
+  var a = q.attribute || {};
+  var m = a.maxScore || a.max || a.scoreMax;
+  if (m && m > 0) return m;
+  // children[0].attribute 里也可能有
+  if (q.children && q.children[0] && q.children[0].attribute) {
+    var ca = q.children[0].attribute;
+    var cm = ca.maxScore || ca.max;
+    if (cm && cm > 0) return cm;
+  }
+  return 5;
+}
+
+/**
+ * 级联题：取第 lvl 级（0-based）的选项列表
+ * = 根据 path 的前 lvl 项定位到该级，返回该级全部选项
+ * 用于左右多列联动 UI：第 1 列=第0级，第 2 列=第1级...
+ */
+function cascaderOptionsAt(dataSource, path, lvl) {
+  var p = [];
+  if (path) {
+    for (var i = 0; i < lvl && i < path.length; i++) p.push(path[i]);
+  }
+  return cascaderOptions(dataSource, p);
+}
+
+/**
+ * Score 题：显示样式（star/heart/smile，默认 star）
+ * 对应后端 SurveySchema.Attribute.scoreStyle
+ * 注意：scoreStyle 可能配在 q.attribute 或 q.children[0].attribute（编辑器实际存后者），两处都查
+ */
+function scoreStyle(q) {
+  if (!q) return 'star';
+  if (q.attribute && q.attribute.scoreStyle) return q.attribute.scoreStyle;
+  if (q.children && q.children[0] && q.children[0].attribute && q.children[0].attribute.scoreStyle) {
+    return q.children[0].attribute.scoreStyle;
+  }
+  return 'star';
+}
+
+/**
+ * Score 题：第 n 个位置的图标字符
+ * star=★  heart=♥  smile=表情随位置变化（哭→难过→平静→微笑→大笑）
+ */
+function scoreIcon(q, n) {
+  var style = scoreStyle(q);
+  // 注意：WXS 不支持 \uXXXX 转义，必须直接写字面字符
+  if (style === 'heart') return '♥';
+  if (style === 'smile') {
+    var faces = ['😭', '😢', '😐', '🙂', '😄'];
+    var idx = n - 1;
+    if (idx < 0) idx = 0;
+    if (idx > 4) idx = 4;
+    return faces[idx];
+  }
+  return '★';   // 默认 star
+}
+
+/**
+ * FillBlank 题：输入控件类型
+ * 时间格式（dateTimeFormat 为 HH:mm / HH:mm:ss）优先于 dataType=date，
+ * 避免 dataType=date + dateTimeFormat=HH:mm:ss 被误判成“年月日”选择器
+ * 返回：'time' | 'date' | 'number' | 'mobile' | 'idcard' | 'text'
+ */
+function fillBlankMode(q) {
+  var a = (q && q.children && q.children[0] && q.children[0].attribute) || (q && q.attribute) || {};
+  var fmt = a.dateTimeFormat || '';
+  if (a.dataType === 'time' || fmt === 'HH:mm:ss' || fmt === 'HH:mm') return 'time';
+  if (a.dataType === 'date') return 'date';
+  if (a.dataType === 'number' || a.dataType === 'integer') return 'number';
+  if (a.dataType === 'mobile') return 'mobile';
+  if (a.dataType === 'idCard') return 'idcard';
+  return 'text';
+}
+
+/**
+ * Address 题：是否允许拖动地图移动定位
+ * 仅当显式配置 mapMove === true 才允许（q.attribute 或 children[0].attribute）；
+ * 缺省 / false 均不允许（拖动不更新坐标、不重新逆地址解析）
+ */
+function mapMove(q) {
+  if (!q) return false;
+  if (q.attribute && q.attribute.mapMove === true) return true;
+  if (q.children && q.children[0] && q.children[0].attribute && q.children[0].attribute.mapMove === true) return true;
+  return false;
+}
+
+/**
+ * 判断字符串是否为富文本（含 HTML 标签）
+ * 问卷标题/说明/题干可能是纯文本，也可能是 quill 产出的富文本 HTML，
+ * 用本函数决定走 rich-text 渲染还是纯文本渲染
+ * 注意：WXS 不支持正则字面量 /.../，必须用 getRegExp()
+ */
+function isHtml(str) {
+  if (!str || typeof str !== 'string') return false;
+  return getRegExp('<[a-zA-Z/][^>]*>').test(str);
+}
+
+/**
+ * 富文本 nodes 预处理：quill 的对齐用 class（ql-align-*）表达，
+ * 但 rich-text 内部节点不继承页面 class 样式，只有 inline style 生效，
+ * 因此把对齐 class 转成 inline style，保证与 H5 展示一致
+ */
+function richNodes(html) {
+  if (!html) return '';
+  return html
+    .replace(getRegExp('class="ql-align-center"', 'g'), 'style="text-align:center;"')
+    .replace(getRegExp('class="ql-align-right"', 'g'), 'style="text-align:right;"')
+    .replace(getRegExp('class="ql-align-justify"', 'g'), 'style="text-align:justify;"');
+}
+
+/**
+ * MatrixAuto 下拉列：根据已存 value 从 col.dataSource 里找 label 用于回显
+ * dataSource 结构：[{label, value}]
+ */
+function autoSelectLabel(col, val) {
+  if (!col || !col.dataSource || !val) return '';
+  for (var i = 0; i < col.dataSource.length; i++) {
+    if (col.dataSource[i].value === val) return col.dataSource[i].label;
+  }
+  return '';
+}
+
+module.exports = {
+  selectLabel: selectLabel,
+  contains: contains,
+  range: range,
+  get: get,
+  cascaderOptions: cascaderOptions,
+  cascaderOptionsAt: cascaderOptionsAt,
+  cascaderLabel: cascaderLabel,
+  cascaderDepth: cascaderDepth,
+  matrixVal: matrixVal,
+  matrixChecked: matrixChecked,
+  stripHtml: stripHtml,
+  isHtml: isHtml,
+  richNodes: richNodes,
+  emptyRows: emptyRows,
+  scoreMax: scoreMax,
+  scoreStyle: scoreStyle,
+  scoreIcon: scoreIcon,
+  fillBlankMode: fillBlankMode,
+  mapMove: mapMove,
+  autoSelectLabel: autoSelectLabel
+};
