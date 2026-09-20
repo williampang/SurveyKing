@@ -459,7 +459,7 @@ Page({
           loginCode: (loginRes && loginRes.code) || ''
         };
         wx.request({
-          url: `${this.data.baseUrl}/api/public/wechat/getPhoneNumber`,
+          url: `${this.data.baseUrl}/apis/v1/public/wechat/getPhoneNumber`,
           method: 'POST',
           header: { 'content-type': 'application/json' },
           data: payload,
@@ -469,14 +469,14 @@ Page({
             const body = (res && res.data) || {};
             const data = body.data || body;
             const phone = data.phone || data.phoneNumber || data.purePhoneNumber || '';
-            if (res.statusCode !== 200 || (body.code !== undefined && body.code !== 200) || !phone) {
+            if (res.statusCode !== 200 || (body.code !== undefined && body.code !== 20000) || !phone) {
               this.setData({
-                phoneTip: `❌ 后端换取手机号失败：${body.message || JSON.stringify(body).slice(0, 120)}\n（需实现 POST /api/public/wechat/getPhoneNumber，可先手动输入名单后点“校验名单”）`
+                phoneTip: `❌ 后端换取手机号失败：${body.message || JSON.stringify(body).slice(0, 120)}`
               });
               wx.showToast({ title: '换取手机号失败', icon: 'none' });
               return;
             }
-            this.setData({ phoneTip: `✅ 已获取手机号：${phone}，正在校验名单...` });
+            this.setData({ phoneTip: `✅ 已获取手机号：${phone}，正在校验...` });
             // 先本地回填 UI，再调 validateProject 拉取真实问卷
             this.setAnswer(qid, String(phone));
             this._validateWhitelist(String(phone));

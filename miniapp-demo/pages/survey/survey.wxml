@@ -48,8 +48,8 @@
             📱 一键获取微信手机号
           </button>
           <view class="phone-tip" wx:if="{{phoneTip}}">{{phoneTip}}</view>
-          <view class="phone-or">或手动输入名单</view>
-          <input class="input" type="number" maxlength="20" placeholder="请输入名单（手机号）"
+          <view class="phone-or">或手动输入手机号</view>
+          <input class="input" type="number" maxlength="20" placeholder="请输入手机号"
                  value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
           <button class="validate-btn"
                   bindtap="onValidateWhitelistTap"
@@ -499,10 +499,10 @@
       </view>
     </view>
 
-    <!-- 提交按钮（白名单登录表单模式下隐藏，需先校验名单拿到真实问卷） -->
+    <!-- 提交按钮（白名单登录表单模式下隐藏，需先校验名单拿到真实问卷）({{answeredCount}} / {{totalCount}}) -->
     <view class="card submit-card" wx:if="{{!whitelistOnly}}">
       <button class="big-btn submit" bindtap="submit" loading="{{submitting}}" disabled="{{submitting}}">
-        ✅ {{project.survey.attribute.submitButton || '提交答卷'}} ({{answeredCount}} / {{totalCount}})
+        ✅ {{project.survey.attribute.submitButton || '提交答卷'}}
       </button>
       <view class="submit-tip" wx:if="{{project.survey.attribute.suffix}}">
         {{project.survey.attribute.suffix}}
