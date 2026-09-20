@@ -42,7 +42,16 @@ Page({
     whitelistOnly: false,      // 是否只有这一个字段（true 则获取到手机号后自动提交）
     phoneLoading: false,       // 正在向后端换取手机号
     phoneTip: '',              // 手机号获取提示文案
-    matrixStyle: DEFAULT_MATRIX_STYLE   // 矩阵单选/多选样式：chips 胶囊（默认）| table 表格
+    matrixStyle: DEFAULT_MATRIX_STYLE,   // 矩阵单选/多选样式：chips 胶囊（默认）| table 表格
+    // 短信验证（一键获取手机号失败 或 手动输入手机号时启用）
+    openid: '',            // 静默获取：wx.login → 后端换 openid，缓存到 globalData.openid
+    smsMode: false,        // 是否展示短信验证区
+    smsReason: '',         // 进入短信验证的原因提示（授权失败/手动输入等）
+    smsPhone: '',          // 待验证手机号
+    smsCode: '',           // 用户输入的 4 位验证码
+    smsSending: false,     // 发送验证码请求中
+    smsVerifying: false,   // 校验验证码请求中
+    smsCountdown: 0        // 重发倒计时（秒），>0 时禁用发送按钮
   },
 
   onLoad(options) {
@@ -62,8 +71,15 @@ Page({
     if (opts.title) wx.setNavigationBarTitle({ title: decodeURIComponent(opts.title) });
     // 矩阵样式配置：页面参数 matrixStyle=table|chips，不传则用默认胶囊样式
     if (opts.matrixStyle === 'table' || opts.matrixStyle === 'chips') this.setData({ matrixStyle: opts.matrixStyle });
+    // 静默获取 openid（短信验证接口依赖），不阻塞问卷加载
+    this._ensureOpenid(openid => this.setData({ openid: openid || '' }));
     // 进入测评页即自动加载问卷（无需再点大按钮）
     this.loadAndShow();
+  },
+
+  onUnload() {
+    // 清理短信倒计时定时器，避免页面销毁后 setData 报错
+    if (this._smsTimer) { clearInterval(this._smsTimer); this._smsTimer = null; }
   },
 
   setStatus(msg, type = 'info') {
@@ -436,14 +452,22 @@ Page({
     const detail = e.detail || {};
     console.log('[getPhoneNumber] detail =', detail);
 
-    // 用户拒绝或调用失败
+    // 用户拒绝或调用失败 → 降级到短信验证
     if (detail.errMsg && detail.errMsg.indexOf(':ok') === -1) {
-      this.setData({ phoneTip: '❌ 未授权手机号：' + detail.errMsg + '（可手动输入名单后点“校验名单”）' });
+      this.setData({
+        phoneTip: '❌ 未授权手机号：' + detail.errMsg + '（请手动输入手机号后短信验证）',
+        smsMode: true,
+        smsReason: '微信手机号授权失败，请使用短信验证'
+      });
       wx.showToast({ title: '未授权手机号', icon: 'none' });
       return;
     }
     if (!detail.code && !detail.encryptedData) {
-      this.setData({ phoneTip: '❌ 微信未返回手机号凭证（开发者工具需真机预览测试）' });
+      this.setData({
+        phoneTip: '❌ 微信未返回手机号凭证（开发者工具需真机预览测试）',
+        smsMode: true,
+        smsReason: '微信未返回手机号凭证，请使用短信验证'
+      });
       return;
     }
 
@@ -470,8 +494,11 @@ Page({
             const data = body.data || body;
             const phone = data.phone || data.phoneNumber || data.purePhoneNumber || '';
             if (res.statusCode !== 200 || (body.code !== undefined && body.code !== 20000) || !phone) {
+              // 后端换取失败 → 降级到短信验证
               this.setData({
-                phoneTip: `❌ 后端换取手机号失败：${body.message || JSON.stringify(body).slice(0, 120)}`
+                phoneTip: `❌ 后端换取手机号失败：${body.message || JSON.stringify(body).slice(0, 120)}`,
+                smsMode: true,
+                smsReason: '微信手机号换取失败，请使用短信验证'
               });
               wx.showToast({ title: '换取手机号失败', icon: 'none' });
               return;
@@ -482,28 +509,213 @@ Page({
             this._validateWhitelist(String(phone));
           },
           fail: (err) => {
-            this.setData({ phoneTip: `❌ 请求后端失败：${err.errMsg}\n（需在服务器实现 POST /api/public/wechat/getPhoneNumber）` });
+            this.setData({
+              phoneLoading: false,
+              phoneTip: `❌ 请求后端失败：${err.errMsg}\n（需在服务器实现 POST /api/public/wechat/getPhoneNumber）`,
+              smsMode: true,
+              smsReason: '微信手机号接口请求失败，请使用短信验证'
+            });
             wx.showToast({ title: '请求失败', icon: 'none' });
           },
           complete: () => this.setData({ phoneLoading: false })
         });
       },
       fail: (err) => {
-        this.setData({ phoneLoading: false, phoneTip: `❌ wx.login 失败：${err.errMsg}` });
+        this.setData({
+          phoneLoading: false,
+          phoneTip: `❌ wx.login 失败：${err.errMsg}`,
+          smsMode: true,
+          smsReason: 'wx.login 失败，请使用短信验证'
+        });
       }
     });
   },
 
   /**
-   * 手动输入名单后点击“校验名单”按钮（降级入口，不依赖微信手机号授权）
+   * 手动输入手机号后点击“下一步：短信验证”：
+   * 校验手机号格式 → 进入短信验证模式 → 自动发送验证码。
+   * （手动输入无法证明手机号归属，必须短信验证通过后才能调 validateProject）
    */
   onValidateWhitelistTap() {
     const val = (this.data.answers['whitelistName'] || '').toString().trim();
     if (!val) {
-      wx.showToast({ title: '请先输入名单', icon: 'none' });
+      wx.showToast({ title: '请先输入手机号', icon: 'none' });
       return;
     }
-    this._validateWhitelist(val);
+    if (!/^1\d{10}$/.test(val)) {
+      wx.showToast({ title: '请输入正确的 11 位手机号', icon: 'none' });
+      return;
+    }
+    // 切到短信验证模式并自动发送验证码
+    this.setData({
+      smsMode: true,
+      smsPhone: val,
+      smsCode: '',
+      smsReason: '手动输入手机号需短信验证'
+    });
+    this._sendSmsCode(val);
+  },
+
+  /* ==========================================================
+   * 短信验证：静默获取 openid → sendVerifier → verifyCode
+   * ========================================================== */
+
+  /**
+   * 静默获取 openid：优先读 globalData 缓存，否则 wx.login 拿 code 后
+   * 调后端 /apis/v1/public/wechat/getOpenid 换取（后端需实现 jscode2session）。
+   * 获取失败回调空串，由调用方提示。
+   */
+  _ensureOpenid(cb) {
+    const app = getApp();
+    if (app && app.globalData && app.globalData.openid) {
+      cb(app.globalData.openid);
+      return;
+    }
+    wx.login({
+      success: (loginRes) => {
+        if (!loginRes || !loginRes.code) { cb(''); return; }
+        wx.request({
+          url: `${this.data.baseUrl}/apis/v1/public/wechat/getOpenid`,
+          method: 'POST',
+          header: { 'content-type': 'application/json' },
+          data: { code: loginRes.code },
+          timeout: 15000,
+          success: (res) => {
+            const body = (res && res.data) || {};
+            const data = body.data || body;
+            const openid = data.openid || data.openId || '';
+            if (openid && app && app.globalData) app.globalData.openid = openid;
+            cb(openid);
+          },
+          fail: (err) => {
+            console.error('[openid] 获取失败', err);
+            cb('');
+          }
+        });
+      },
+      fail: (err) => {
+        console.error('[openid] wx.login 失败', err);
+        cb('');
+      }
+    });
+  },
+
+  onSmsPhoneInput(e) { this.setData({ smsPhone: e.detail.value }); },
+  onSmsCodeInput(e)  { this.setData({ smsCode: e.detail.value }); },
+
+  /** 点击“发送验证码”按钮（短信验证区内重发） */
+  onSendSmsCode() {
+    const phone = (this.data.smsPhone || '').toString().trim();
+    if (!/^1\d{10}$/.test(phone)) {
+      wx.showToast({ title: '请输入正确的 11 位手机号', icon: 'none' });
+      return;
+    }
+    this._sendSmsCode(phone);
+  },
+
+  /**
+   * 调 POST /apis/v1/sms/sms/sendVerifier { openid, phoneNumber } 发送 4 位验证码，
+   * 成功后启动 60s 倒计时。
+   */
+  _sendSmsCode(phone) {
+    if (this.data.smsSending || this.data.smsCountdown > 0) return;
+    this._ensureOpenid((openid) => {
+      if (!openid) {
+        this.setData({ phoneTip: '❌ 获取 openid 失败，请检查网络或稍后重试' });
+        wx.showToast({ title: '获取 openid 失败', icon: 'none' });
+        return;
+      }
+      this.setData({ smsSending: true });
+      wx.request({
+        url: `${this.data.baseUrl}/apis/v1/sms/sms/sendVerifier`,
+        method: 'POST',
+        header: { 'content-type': 'application/json' },
+        data: { openid: openid, phoneNumber: String(phone) },
+        timeout: 15000,
+        success: (res) => {
+          console.log('[sms] sendVerifier =', res);
+          const body = (res && res.data) || {};
+          const okCode = body.code === undefined || body.code === 200 || body.code === 20000;
+          if (res.statusCode !== 200 || !okCode) {
+            wx.showToast({ title: body.message || '发送失败', icon: 'none' });
+            return;
+          }
+          wx.showToast({ title: '验证码已发送', icon: 'success' });
+          this._startSmsCountdown();
+        },
+        fail: (err) => {
+          console.error('[sms] sendVerifier fail', err);
+          wx.showToast({ title: '网络异常，发送失败', icon: 'none' });
+        },
+        complete: () => this.setData({ smsSending: false })
+      });
+    });
+  },
+
+  /** 60s 重发倒计时 */
+  _startSmsCountdown() {
+    if (this._smsTimer) clearInterval(this._smsTimer);
+    this.setData({ smsCountdown: 60 });
+    this._smsTimer = setInterval(() => {
+      const n = this.data.smsCountdown - 1;
+      if (n <= 0) {
+        clearInterval(this._smsTimer);
+        this._smsTimer = null;
+        this.setData({ smsCountdown: 0 });
+      } else {
+        this.setData({ smsCountdown: n });
+      }
+    }, 1000);
+  },
+
+  /**
+   * 调 POST /apis/v1/sms/sms/verifyCode { openid, code } 校验 4 位验证码，
+   * 通过后回填 whitelistName 并走 validateProject 拉真实问卷。
+   */
+  onVerifySmsCode() {
+    const code = (this.data.smsCode || '').toString().trim();
+    if (!/^\d{4}$/.test(code)) {
+      wx.showToast({ title: '请输入 4 位数字验证码', icon: 'none' });
+      return;
+    }
+    const phone = (this.data.smsPhone || '').toString().trim();
+    if (!/^1\d{10}$/.test(phone)) {
+      wx.showToast({ title: '手机号有误，请重新输入', icon: 'none' });
+      return;
+    }
+    this._ensureOpenid((openid) => {
+      if (!openid) {
+        wx.showToast({ title: '获取 openid 失败', icon: 'none' });
+        return;
+      }
+      this.setData({ smsVerifying: true });
+      wx.request({
+        url: `${this.data.baseUrl}/apis/v1/sms/sms/verifyCode`,
+        method: 'POST',
+        header: { 'content-type': 'application/json' },
+        data: { openid: openid, code: code },
+        timeout: 15000,
+        success: (res) => {
+          console.log('[sms] verifyCode =', res);
+          const body = (res && res.data) || {};
+          const okCode = body.code === undefined || body.code === 200 || body.code === 20000;
+          if (res.statusCode !== 200 || !okCode) {
+            wx.showToast({ title: body.message || '验证码错误', icon: 'none' });
+            return;
+          }
+          wx.showToast({ title: '验证通过', icon: 'success' });
+          // 回填 whitelistName 输入框，再走名单校验拉真实问卷
+          this.setAnswer('whitelistName', phone);
+          this.setData({ phoneTip: `✅ 短信验证通过：${phone}，正在校验名单...` });
+          this._validateWhitelist(phone);
+        },
+        fail: (err) => {
+          console.error('[sms] verifyCode fail', err);
+          wx.showToast({ title: '网络异常，验证失败', icon: 'none' });
+        },
+        complete: () => this.setData({ smsVerifying: false })
+      });
+    });
   },
 
   /**

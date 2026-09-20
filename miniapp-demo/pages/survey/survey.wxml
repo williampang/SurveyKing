@@ -1,6 +1,42 @@
 <!--pages/survey/survey.wxml - 测评页：承接问卷主体渲染 + 提交校验（shortId 由首页扫码/演示跳转带入）-->
 <wxs src="../../utils/helper.wxs" module="helper" />
 
+<!-- 短信验证区：一键获取微信手机号失败 或 用户手动输入手机号时启用。
+     依赖静默获取的 openid（wx.login → 后端换 openid，缓存到 globalData.openid）：
+       1) POST /apis/v1/sms/sms/sendVerifier  { openid, phoneNumber }  发送 4 位验证码（60s 倒计时）
+       2) POST /apis/v1/sms/sms/verifyCode    { openid, code }         校验验证码
+     校验通过后回填 whitelistName 并调 /api/public/validateProject 拉真实问卷。 -->
+<template name="smsVerify">
+  <view class="sms-verify" wx:if="{{smsMode}}">
+    <view class="sms-title">📨 短信验证</view>
+    <view class="sms-reason" wx:if="{{smsReason}}">{{smsReason}}</view>
+    <view class="sms-row">
+      <text class="sms-label">手机号</text>
+      <input class="input sms-input" type="number" maxlength="11"
+             placeholder="请输入手机号" value="{{smsPhone}}"
+             bindinput="onSmsPhoneInput" disabled="{{smsVerifying}}" />
+    </view>
+    <view class="sms-row">
+      <text class="sms-label">验证码</text>
+      <input class="input sms-input sms-code" type="number" maxlength="4"
+             placeholder="4 位数字" value="{{smsCode}}"
+             bindinput="onSmsCodeInput" disabled="{{smsVerifying}}" />
+      <button class="sms-send-btn" size="mini"
+              bindtap="onSendSmsCode"
+              loading="{{smsSending}}"
+              disabled="{{smsSending || smsCountdown > 0 || smsVerifying}}">
+        {{smsCountdown > 0 ? smsCountdown + 's 后重发' : '发送验证码'}}
+      </button>
+    </view>
+    <button class="validate-btn sms-verify-btn"
+            bindtap="onVerifySmsCode"
+            loading="{{smsVerifying}}"
+            disabled="{{smsVerifying || smsCode.length !== 4}}">
+      ✅ 校验验证码并加载问卷
+    </button>
+  </view>
+</template>
+
 <view class="container">
 
   <!-- 顶部工具条：测评ID + 重新加载 -->
@@ -44,18 +80,21 @@
           <button class="phone-btn" open-type="getPhoneNumber"
                   bindgetphonenumber="onGetPhoneNumber"
                   data-qid="{{q.id}}"
-                  loading="{{phoneLoading}}" disabled="{{phoneLoading}}">
+                  loading="{{phoneLoading}}" disabled="{{phoneLoading || smsMode}}">
             📱 一键获取微信手机号
           </button>
           <view class="phone-tip" wx:if="{{phoneTip}}">{{phoneTip}}</view>
-          <view class="phone-or">或手动输入手机号</view>
-          <input class="input" type="number" maxlength="20" placeholder="请输入手机号"
-                 value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
-          <button class="validate-btn"
-                  bindtap="onValidateWhitelistTap"
-                  loading="{{phoneLoading}}" disabled="{{phoneLoading || !answers[q.id]}}">
-            ✅ 校验名单并加载问卷
-          </button>
+          <block wx:if="{{!smsMode}}">
+            <view class="phone-or">或手动输入手机号（需短信验证）</view>
+            <input class="input" type="number" maxlength="11" placeholder="请输入手机号"
+                   value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
+            <button class="validate-btn"
+                    bindtap="onValidateWhitelistTap"
+                    loading="{{phoneLoading}}" disabled="{{phoneLoading || !answers[q.id]}}">
+              📩 下一步：短信验证
+            </button>
+          </block>
+          <template is="smsVerify" data="{{smsMode, smsReason, smsPhone, smsCode, smsSending, smsVerifying, smsCountdown}}" />
         </view>
       </block>
     </view>
@@ -138,18 +177,21 @@
           <button class="phone-btn" open-type="getPhoneNumber"
                   bindgetphonenumber="onGetPhoneNumber"
                   data-qid="{{q.id}}"
-                  loading="{{phoneLoading}}" disabled="{{phoneLoading}}">
+                  loading="{{phoneLoading}}" disabled="{{phoneLoading || smsMode}}">
             📱 一键获取微信手机号
           </button>
           <view class="phone-tip" wx:if="{{phoneTip}}">{{phoneTip}}</view>
-          <view class="phone-or">或手动输入名单</view>
-          <input class="input" type="number" maxlength="20" placeholder="请输入名单（手机号）"
-                 value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
-          <button class="validate-btn"
-                  bindtap="onValidateWhitelistTap"
-                  loading="{{phoneLoading}}" disabled="{{phoneLoading || !answers[q.id]}}">
-            ✅ 校验名单并加载问卷
-          </button>
+          <block wx:if="{{!smsMode}}">
+            <view class="phone-or">或手动输入名单（需短信验证）</view>
+            <input class="input" type="number" maxlength="11" placeholder="请输入名单（手机号）"
+                   value="{{answers[q.id]}}" bindinput="onTextInput" bindblur="onBlurValidate" data-qid="{{q.id}}" />
+            <button class="validate-btn"
+                    bindtap="onValidateWhitelistTap"
+                    loading="{{phoneLoading}}" disabled="{{phoneLoading || !answers[q.id]}}">
+              📩 下一步：短信验证
+            </button>
+          </block>
+          <template is="smsVerify" data="{{smsMode, smsReason, smsPhone, smsCode, smsSending, smsVerifying, smsCountdown}}" />
         </view>
         <!-- 时间型：dateTimeFormat 为 HH:mm / HH:mm:ss 或 dataType=time（优先于 date） -->
         <picker wx:elif="{{helper.fillBlankMode(q) === 'time'}}" mode="time"
