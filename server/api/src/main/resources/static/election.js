@@ -95,9 +95,45 @@
     });
   }
 
-  function renderStats(report) {
-    var total = report && report.total != null ? report.total : 0;
-    var stats = (report && report.statistics) || {};
+  // 从答卷列表聚合统计：选择题按选项计数，FillBlank 按填写文本计人名
+  // （answer 结构：questionId -> {childId: true | "文本"}；仅统计 tempSave !== 0 的已完成答卷）
+  function computeStats(list) {
+    var fillBlankIds = {};
+    ((project && project.survey && project.survey.children) || []).forEach(function (question) {
+      if (question.type === 'FillBlank') fillBlankIds[question.id] = true;
+    });
+
+    var choice = {};
+    var blanks = {};
+    var ballots = 0;
+
+    (list || []).forEach(function (item) {
+      if (!item || item.tempSave === 0) return;
+      ballots++;
+      var answer = item.answer || {};
+      Object.keys(answer).forEach(function (questionId) {
+        var value = answer[questionId];
+        if (!value || typeof value !== 'object') return;
+        Object.keys(value).forEach(function (childId) {
+          var cell = value[childId];
+          if (cell === true) {
+            choice[questionId] = choice[questionId] || {};
+            choice[questionId][childId] = (choice[questionId][childId] || 0) + 1;
+          } else if (fillBlankIds[questionId] && typeof cell === 'string' && cell.trim()) {
+            var name = cell.trim();
+            blanks[name] = (blanks[name] || 0) + 1;
+          }
+        });
+      });
+    });
+
+    return { choice: choice, blanks: blanks, ballots: ballots };
+  }
+
+  function renderStats(computed) {
+    var total = computed.ballots;
+    var choice = computed.choice;
+    var blanks = computed.blanks;
     lastUpdated = new Date();
 
     var summary = document.getElementById('elec-summary');
@@ -113,33 +149,34 @@
       return;
     }
 
-    // 选举结果统计表：每个候选人一行（选择题按赞成/不赞成/弃权三选项取数，
-    // 填空题即另选人，按填写条数计赞成）；占比列为按总票数堆叠的条形
+    // 选举结果统计表：选择题每題一行，按赞成/不赞成/弃权三选项取数；
+    // FillBlank 每个填写文本即一个另选人姓名，记 1 个赞成票，按姓名汇总成行；
+    // 占比列为按总票数堆叠的条形
     var rows = [];
     questions.forEach(function (question) {
-      if (question.type === 'Radio' || question.type === 'Checkbox') {
-        var pick = function (title) {
-          var options = question.children || [];
-          for (var i = 0; i < options.length; i++) {
-            if (options[i].title === title) {
-              return (stats[options[i].id] && stats[options[i].id].total) || 0;
-            }
-          }
-          return null;
-        };
-        var yes = pick(OPTION_YES);
-        var no = pick(OPTION_NO);
-        var abstain = pick(OPTION_ABSTAIN);
-        if (yes === null && no === null && abstain === null) return;
-        rows.push({ name: question.title, yes: yes, no: no, abstain: abstain });
-      } else if (question.type === 'FillBlank') {
-        rows.push({
-          name: question.title,
-          yes: (stats[question.id] && stats[question.id].total) || 0,
-          no: null,
-          abstain: null,
-        });
-      }
+      if (question.type !== 'Radio' && question.type !== 'Checkbox') return;
+      var counts = choice[question.id] || {};
+      var pick = function (title) {
+        var options = question.children || [];
+        for (var i = 0; i < options.length; i++) {
+          if (options[i].title === title) return counts[options[i].id] || 0;
+        }
+        return null;
+      };
+      var yes = pick(OPTION_YES);
+      var no = pick(OPTION_NO);
+      var abstain = pick(OPTION_ABSTAIN);
+      if (yes === null && no === null && abstain === null) return;
+      rows.push({ name: question.title, yes: yes, no: no, abstain: abstain });
+    });
+    Object.keys(blanks).forEach(function (name) {
+      rows.push({ name: name, yes: blanks[name], no: null, abstain: null });
+    });
+    // 排序：赞成倒序 → 弃权倒序 → 不赞成倒序
+    rows.sort(function (a, b) {
+      return (b.yes || 0) - (a.yes || 0) ||
+        (b.abstain || 0) - (a.abstain || 0) ||
+        (b.no || 0) - (a.no || 0);
     });
 
     if (!rows.length) {
@@ -182,8 +219,8 @@
     loading = true;
     var button = document.getElementById('elec-refresh');
     if (button) button.disabled = true;
-    api('/report/' + projectId).then(function (report) {
-      renderStats(report);
+    api('/answer/list?current=1&pageSize=1000&projectId=' + encodeURIComponent(projectId) + '&total=0').then(function (payload) {
+      renderStats(computeStats((payload && payload.list) || []));
     }).catch(function (error) {
       if (manual) renderError(error.message);
       var summary = document.getElementById('elec-summary');
@@ -210,7 +247,6 @@
       renderError('缺少问卷 id（ELECTION_CTX.id）');
       return;
     }
-    // todo api 修改成 使用 /api/answer/list?current=1&pageSize=1000&projectId=Lrq82h&total=0
     api('/project?id=' + encodeURIComponent(projectId)).then(function (data) {
       project = data;
       document.title = '选举 - ' + (project && project.name ? project.name : projectId);
