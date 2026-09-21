@@ -33,6 +33,9 @@
   function api(path) {
     return fetch('/api' + path, {
       credentials: 'include',
+      // 禁用 HTTP 缓存，保证每次刷新都拉取最新答卷列表（否则命中缓存会返回旧数据，
+      // 导致 renderStats 里的重新排序看起来「没生效」）
+      cache: 'no-store',
       headers: { Accept: 'application/json' },
     }).then(function (response) {
       if (response.status === 401 || response.status === 403) {
