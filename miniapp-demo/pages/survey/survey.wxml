@@ -32,7 +32,7 @@
             bindtap="onVerifySmsCode"
             loading="{{smsVerifying}}"
             disabled="{{smsVerifying || smsCode.length !== 4}}">
-      ✅ 校验验证码并加载问卷
+      ✅ 校验并加载问卷
     </button>
   </view>
 </template>
@@ -327,7 +327,7 @@
         <view class="loc-result" wx:if="{{answers[q.id]}}">
           <view class="loc-addr">{{answers[q.id].address || answers[q.id].name || '仅获取到坐标（文字地址未解析）'}}</view>
           <view class="loc-geo-err" wx:if="{{answers[q.id].geoError}}">⚠️ 地址解析失败：{{answers[q.id].geoError}}</view>
-          <view class="loc-coord">经度 {{answers[q.id].longitude}} · 纬度 {{answers[q.id].latitude}}</view>
+          <view wx:if="{{answers[q.id].longitude > 0 && answers[q.id].latitude > 0}}" class="loc-coord">经度 {{answers[q.id].longitude}} · 纬度 {{answers[q.id].latitude}}</view>
           <view class="loc-map-wrap" wx:if="{{answers[q.id].latitude}}">
             <map class="loc-map" id="map-{{q.id}}"
                  latitude="{{answers[q.id].latitude}}"

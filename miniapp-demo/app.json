@@ -9,14 +9,16 @@
     "navigationBarTitleText": "SurveyKing Mini",
     "navigationBarTextStyle": "white"
   },
+  "requiredPrivateInfos": [
+    "chooseLocation",
+    "choosePoi",
+    "getFuzzyLocation"
+  ],
   "permission": {
-    "scope.userLocation": {
+    "scope.userFuzzyLocation": {
       "desc": "你的位置信息将用于问卷中“所在位置”题目的填写"
     }
   },
-  "requiredPrivateInfos": [
-    "getLocation"
-  ],
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }

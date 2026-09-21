@@ -946,7 +946,7 @@ Page({
     loading[qid] = true;
     this.setData({ locLoading: loading });
 
-    wx.getLocation({
+    wx.choosePoi({
       type: 'gcj02',
       isHighAccuracy: true,
       success: (loc) => {
@@ -955,10 +955,13 @@ Page({
         this.setAnswer(qid, {
           latitude: loc.latitude,
           longitude: loc.longitude,
-          address: '',
-          name: '',
+          address: loc.address || '',
+          name: loc.name || '',
           accuracy: loc.accuracy
         });
+        if (loc.latitude === 0 && loc.longitude === 0) {
+          return
+        }
         // 逆地址解析：坐标 → 文字地址（不依赖 chooseLocation）
         this._reverseGeocode(loc.latitude, loc.longitude).then(geo => {
           const cur = this.data.answers[qid] || {};
