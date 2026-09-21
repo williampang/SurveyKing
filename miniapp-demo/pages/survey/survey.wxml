@@ -310,11 +310,11 @@
                   data-qid="{{q.id}}"></canvas>
         </view>
         <view class="sig-actions">
-          <button class="sig-btn" size="mini" bindtap="onSigClear" data-qid="{{q.id}}">↻ 重写</button>
-          <button class="sig-btn primary" size="mini" bindtap="onSigConfirm" data-qid="{{q.id}}" disabled="{{!sigHasStroke[q.id]}}">✓ 确认签名</button>
+          <button class="sig-btn" size="mini" bindtap="onSigClear" data-qid="{{q.id}}" disabled="{{sigUploading[q.id]}}">↻ 重写</button>
+          <button class="sig-btn primary" size="mini" bindtap="onSigConfirm" data-qid="{{q.id}}" disabled="{{(!sigHasStroke[q.id] && !answers[q.id]) || sigUploading[q.id]}}">{{sigUploading[q.id] ? '上传中...' : (answers[q.id] ? '✓ 已上传' : '✓ 确认签名')}}</button>
         </view>
-        <view class="sig-preview" wx:if="{{answers[q.id]}}">
-          <image class="sig-img" src="{{answers[q.id]}}" mode="aspectFit" />
+        <view class="sig-preview" wx:if="{{sigPreview[q.id]}}">
+          <image class="sig-img" src="{{sigPreview[q.id]}}" mode="aspectFit" />
           <text class="sig-ok">✓ 已签名</text>
         </view>
       </view>

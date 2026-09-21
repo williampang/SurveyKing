@@ -35,6 +35,8 @@ Page({
     headerImageUrl: '',
     sigHasStroke: {},   // { qid: true } 签名画布是否有笔迹
     sigCtxCache: {},    // { qid: canvasContext } 缓存签名上下文
+    sigPreview: {},     // { qid: url } 签名预览图地址（本地临时路径或服务端预览地址）
+    sigUploading: {},   // { qid: true } 签名正在上传后台
     locLoading: {},     // { qid: true } 定位加载中
     qqMapKey: DEFAULT_QQ_MAP_KEY,   // 逆地址解析 key
     // 白名单登录字段（id=whitelistName）一键获取手机号
@@ -192,12 +194,20 @@ Page({
       answers['whitelistName'] = cachedPhone;
     }
 
+    // 回填场景：签名题 answers[qid] 存的是已上传文件 id，重建预览图地址（服务端预览）
+    const sigPreview = {};
+    children.forEach(q => {
+      if (q.type === 'Signature' && typeof answers[q.id] === 'string' && answers[q.id]) {
+        sigPreview[q.id] = `${baseUrl}/api/public/preview/${answers[q.id]}`;
+      }
+    });
+
     this.setData({
       project, questions: children, answers, totalCount,
       startTime: Date.now(), headerImageUrl, lastSubmit,
       errors: {}, answeredCount, progressPct,
       submitResult: null, submitResultText: '',
-      hasWhitelistName, whitelistOnly,
+      hasWhitelistName, whitelistOnly, sigPreview,
       phoneTip: hasWhitelistName
         ? (cachedPhone
             ? `🔄 检测到已缓存手机号 ${cachedPhone}，正在自动校验名单...`
@@ -914,27 +924,90 @@ Page({
     c.ctx.clearRect(0, 0, c.w, c.h);
     const m = Object.assign({}, this.data.sigHasStroke);
     m[qid] = false;
+    // 清除已上传的文件 id 与预览图
+    const p = Object.assign({}, this.data.sigPreview);
+    delete p[qid];
     this.setAnswer(qid, '', true);
-    this.setData({ sigHasStroke: m });
+    this.setData({ sigHasStroke: m, sigPreview: p });
   },
   onSigConfirm(e) {
     const qid = e.currentTarget.dataset.qid;
     const c = this.data.sigCtxCache[qid];
     if (!c) { wx.showToast({ title: '请先签名', icon: 'none' }); return; }
+    if (this.data.sigUploading[qid]) return;   // 防重复提交
     wx.canvasToTempFilePath({
       canvas: c.node,          // 2d canvas 传 node，不传 canvasId
       fileType: 'png',
       quality: 1,
       success: (res) => {
         console.log('[signature] tempFile =', res.tempFilePath);
-        this.setAnswer(qid, res.tempFilePath);
-        wx.showToast({ title: '签名已保存', icon: 'success' });
+        // 先用本地临时图预览，随后上传后台换成文件 id
+        const p = Object.assign({}, this.data.sigPreview);
+        p[qid] = res.tempFilePath;
+        this.setData({ sigPreview: p });
+        this._uploadSignature(qid, res.tempFilePath);
       },
       fail: (err) => {
         console.error('[signature] fail', err);
-        wx.showToast({ title: '保存失败', icon: 'none' });
+        wx.showToast({ title: '导出签名失败', icon: 'none' });
       }
     }, this);
+  },
+
+  /**
+   * 上传签名图片到后台：POST /api/public/upload (multipart/form-data)
+   *   fileType=4(答卷附件) / basePath=问卷id / questionId=题目id / projectId=问卷id / file=二进制
+   * 成功后将返回的文件 id 存入 answers[qid]，提交时组装为 {qid: {childId: [fileId]}}
+   */
+  _uploadSignature(qid, tempFilePath) {
+    const { baseUrl, shortId, project } = this.data;
+    const projectId = shortId || (project && project.id) || '';
+    const u = Object.assign({}, this.data.sigUploading);
+    u[qid] = true;
+    this.setData({ sigUploading: u });
+    wx.showLoading({ title: '上传中...', mask: true });
+    wx.uploadFile({
+      url: `${baseUrl}/api/public/upload`,
+      filePath: tempFilePath,
+      name: 'file',
+      formData: {
+        fileType: 4,
+        basePath: projectId,
+        questionId: qid,
+        projectId: projectId
+      },
+      timeout: 30000,
+      success: (res) => {
+        console.log('[signature] upload =', res);
+        let body = {};
+        try { body = JSON.parse(res.data); } catch (err) { body = res.data || {}; }
+        const data = (body && body.data) || body || {};
+        const fileId = data && data.id;
+        const okCode = body.code === undefined || body.code === 200 || body.code === 20000;
+        if (res.statusCode !== 200 || !okCode || !fileId) {
+          wx.showToast({ title: (body && body.message) || '签名上传失败', icon: 'none' });
+          return;
+        }
+        // 答案存文件 id（提交时组装 {childId: [fileId]}），预览改用服务端地址以便回填后仍可显示
+        this.setAnswer(qid, fileId);
+        const p = Object.assign({}, this.data.sigPreview);
+        p[qid] = data.previewUrl
+          ? (data.previewUrl.indexOf('http') === 0 ? data.previewUrl : `${baseUrl}/api/public/preview/${fileId}`)
+          : `${baseUrl}/api/public/preview/${fileId}`;
+        this.setData({ sigPreview: p });
+        wx.showToast({ title: '签名已保存', icon: 'success' });
+      },
+      fail: (err) => {
+        console.error('[signature] upload fail', err);
+        wx.showToast({ title: '上传失败，请重试', icon: 'none' });
+      },
+      complete: () => {
+        wx.hideLoading();
+        const u2 = Object.assign({}, this.data.sigUploading);
+        u2[qid] = false;
+        this.setData({ sigUploading: u2 });
+      }
+    });
   },
 
   /* ==========================================================
@@ -1192,8 +1265,8 @@ Page({
    *   - MatrixCheckbox:{rowId: {colId1: true, colId2: true}}
    *   - HorzBlank/MultipleBlank/MatrixFillBlank: {childId: value} —— 已正确
    *   - Cascader:      {childId_level0: val0, childId_level1: val1, ...}
-   *   - Address:       {childId: {latitude, longitude, address, name}}
-   *   - Signature:     {childId: tempFilePath}  (TODO: 需先上传)
+   *   - Address:       "地址[经度, 纬度]"（顶层字符串，如 "...大桥北路1号[118.79, 32.06]"）
+   *   - Signature:     {childId: [已上传的文件id]}  (确认签名时已调 /api/public/upload 上传)
    */
   _toSubmitFormat(q, v) {
     const childId = (q.children && q.children[0] && q.children[0].id) || q.id;
@@ -1282,14 +1355,21 @@ Page({
         return obj;
       }
 
-      case 'Address':
-        // 内部存 {latitude, longitude, address, name} → 提交 {childId: {...}}
-        if (v && typeof v === 'object') return { [childId]: v };
-        return v;
+      case 'Address': {
+        // 内部存 {latitude, longitude, address, name} → 提交顶层字符串 "地址[经度, 纬度]"
+        // 例："江苏省南京市浦口区大桥北路1号[118.79, 32.06]"
+        if (v && typeof v === 'object') {
+          const addr = v.address || v.name || '';
+          const lng = v.longitude != null ? v.longitude : 0;
+          const lat = v.latitude != null ? v.latitude : 0;
+          return { [childId]: `${addr}[${lng}, ${lat}]` };
+        }
+        return { [childId]:v };
+      }
 
       case 'Signature':
-        // 内部存 tempFilePath → 提交 {childId: filePath} (TODO: 需先调 upload 接口)
-        if (typeof v === 'string' && v) return { [childId]: v };
+        // 内部存已上传的文件 id → 提交 {childId: [fileId]}（后端 parseFileQuestionValue 支持 List<String>）
+        if (typeof v === 'string' && v) return { [childId]: [v] };
         return v;
 
       case 'Barcode':

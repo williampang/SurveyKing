@@ -18,10 +18,11 @@ Page({
     offsets: {},        // { shortId: 滑动偏移px } 用于滑动删除
     // 演示测评列表：一点即跳转对应测评页
     demos: [
-      { shortId: 'Lrq82h', title: '选举1' },
-      { shortId: 'x41UMW', title: '选举2' },
-      { shortId: 'VEb4hf', title: '演示1' },
-      { shortId: 'tmjWKk', title: '演示2' }
+      { shortId: 'Lrq82h', title: '选举3' },
+      { shortId: 'uhyKNJ', title: '选举2' },
+      { shortId: 'x41UMW', title: '选举1' },
+      { shortId: 'VEb4hf', title: '演示2' },
+      { shortId: 'tmjWKk', title: '演示1' }
     ]
   },
 
