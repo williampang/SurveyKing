@@ -26,6 +26,8 @@ export async function renderReport(container, project) {
 
       const questions = project.survey?.children || [];
       const stats = rep?.statistics || {};
+      // 后端 statistics 为扁平结构：题目 id 与选项 id 同级作 key，值为 {total,...}
+      const optCountOf = (optId) => stats[optId]?.total ?? 0;
 
       if (questions.length === 0) {
         cardsList.innerHTML = '<div class="card" style="text-align:center;color:#8c8c8c;">问卷中暂无题目</div>';
@@ -33,8 +35,8 @@ export async function renderReport(container, project) {
       }
 
       cardsList.innerHTML = questions.map((q, idx) => {
-        const qStat = stats[q.id] || {};
-        const qTotal = qStat.total ?? total;
+        const qStat = stats[q.id];
+        const qTotal = qStat?.total ?? 0;
         const options = q.children || [];
 
         return `
@@ -47,7 +49,7 @@ export async function renderReport(container, project) {
             ${options.length > 0 ? `
               <div class="chart-bar-container">
                 ${options.map((opt) => {
-                  const optCount = qStat[opt.id] ?? 0;
+                  const optCount = optCountOf(opt.id);
                   const pct = qTotal > 0 ? Math.round((optCount / qTotal) * 100) : 0;
                   return `
                     <div class="chart-bar-row">
@@ -71,7 +73,7 @@ export async function renderReport(container, project) {
                 </thead>
                 <tbody>
                   ${options.map((opt) => {
-                    const optCount = qStat[opt.id] ?? 0;
+                    const optCount = optCountOf(opt.id);
                     const pct = qTotal > 0 ? Math.round((optCount / qTotal) * 100) : 0;
                     return `
                       <tr>
