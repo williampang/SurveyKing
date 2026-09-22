@@ -1422,12 +1422,31 @@ Page({
 
     // 转换答案格式：小程序内部存储格式 → H5/后端识别的提交格式
     // 后端 ProjectStatHelper 要求 answer[qid] 必须是 Map 对象，不能是字符串/数组/数字
+    // 提交前基于最新 answers 重新计算 visibleRule，隐藏题（含原生 display=hidden）不入库
+    const submitCtx = formula.buildVariableContext(questions, answers);
+    const isQuestionVisible = (q) => {
+      const attr = q.attribute || {};
+      if (attr.visibleRule) {
+        return formula.evaluateVisibleRule(attr.visibleRule, submitCtx);
+      }
+      if (attr.display === 'hidden') return false;
+      // 无规则时回退到缓存的 _display（_evaluateRulesAndFormulas 写入），默认视为可见
+      return q._display !== 'hidden';
+    };
     const cleanAnswer = {};
+    const skippedHidden = [];
     questions.forEach(q => {
+      if (!isQuestionVisible(q)) {
+        skippedHidden.push(q.id);
+        return;
+      }
       let v = answers[q.id];
       if (validator.isEmpty(v) && !(q.attribute && q.attribute.required)) return;
       cleanAnswer[q.id] = this._toSubmitFormat(q, v);
     });
+    if (skippedHidden.length) {
+      console.log('[submit] 跳过不可见题：', skippedHidden);
+    }
 
     let sysInfo = {};
     try { sysInfo = wx.getSystemInfoSync(); } catch (e) {}

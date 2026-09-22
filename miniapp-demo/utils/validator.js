@@ -286,18 +286,23 @@ function validateQuestion(question, value, formulaCtx) {
  * @returns {String|null} 错误消息
  */
 function validateAll(questions, answers, ctx) {
-  const formulaCtx = ctx || formula.buildVariableContext(questions, answers);
+  const formulaCtx = formula.buildVariableContext(questions, answers); // ctx || 
   const errors = {};
   let firstErrorQid = null;
 
   questions.forEach(q => {
     // 1. 若配置了 visibleRule 且当前处于隐藏状态，跳过校验
+    // console.log(q)
     const attr = q.attribute || {};
     if (attr.visibleRule) {
       const isVisible = formula.evaluateVisibleRule(attr.visibleRule, formulaCtx);
       if (!isVisible) return;
+    } else if (attr.display === 'hidden') {
+      // 后台原生隐藏题（无 visibleRule）：与 submit 层过滤保持一致，不参与校验，
+      // 避免 display=hidden 且 required=true 的题目卡住提交
+      return;
     }
-
+    // console.log(q)
     // 2. 基础题型及数据类型、必填、单题 validateRule 校验
     const err = validateQuestion(q, answers[q.id], formulaCtx);
     if (err) {
@@ -305,10 +310,11 @@ function validateAll(questions, answers, ctx) {
       if (!firstErrorQid) firstErrorQid = q.id;
       return;
     }
-
+    
     // 3. 兜底 validateRule 校验（防止未答题目如 Q1 虽未填写特定内容但违反全局逻辑）
     if (attr.validateRule) {
       const ruleRes = formula.evaluateValidateRule(attr.validateRule, formulaCtx);
+      // console.log(ruleRes, attr.validateRule, formulaCtx)
       if (!ruleRes.valid) {
         errors[q.id] = ruleRes.message || '输入内容不符合限制规则';
         if (!firstErrorQid) firstErrorQid = q.id;

@@ -109,7 +109,13 @@ const FUNCTIONS = {
     let sum = 0;
     for (const item of list) {
       const n = toNumber(item);
-      if (!isNaN(n)) sum += n;
+      if (!isNaN(n)) {
+        sum += n;
+      } else if (typeof item === 'string' && item.trim() !== '') {
+        // 兼容 Remark 里 SUM(Q1~Q11) 之类的“填写进度”用法：
+        // 填空题/文本题现在存的是实际文本，非空即视为已填写，计为 1
+        sum += 1;
+      }
     }
     return sum;
   },
@@ -338,7 +344,7 @@ function matchesCriteria(val, criteria) {
  * 构建题目别名查找表
  * @param {Array} questions 问卷 children 题目列表
  * @param {Object} answers 答案字典 { qid: value }
- * @returns {Object} 变量映射字典，包含 Q1, Q1A1, Q1A2, TEXT(Q1), SCORE(Q1), COUNT(Q1) 等
+ * @returns {Object} 变量映射字典，包含 Q1, Q1A1, Q1A2, TEXT(Q1), SCORE(Q1), COUNT(Q1), VISIBLE(Q1) 等
  */
 function buildVariableContext(questions, answers) {
   const ctx = {};
@@ -359,9 +365,11 @@ function buildVariableContext(questions, answers) {
     } else if (q.type === 'Radio' || q.type === 'Select') {
       val = rawVal;
     }
-    // 填空题/文本题在参与求和或算术计算时，如果有填写内容则计为 1，未填则为 0
+    // 填空题/文本题：保留实际文本值，以支持字符串比较（如 Q13==Q12, Q13!=""）。
+    // 未填写时统一归一化为空字符串，避免 undefined != "" 在 JS 松散比较下为 true 的陷阱。
+    // 需要在算术里按“是否填写”计数时，请改用 COUNTA(Q1~Q11) 或 COUNT(Qx)（ctx 中已单独暴露 COUNT_Qx）。
     if (q.type === 'FillBlank' || q.type === 'Textarea') {
-      ctx[qKey] = isValid(val) ? 1 : 0;
+      ctx[qKey] = isValid(val) ? String(val) : '';
     } else {
       ctx[qKey] = val;
     }
@@ -460,6 +468,46 @@ function buildVariableContext(questions, answers) {
     ctx[`COUNT_${qKey}`] = countVal;
   });
 
+  // 5. 题目可见性 (VISIBLE_Q1, VISIBLE_<qid>)
+  // 说明：visibleRule 会引用其他题的答案，需要在基础 ctx 构建完成后再做第二遍扫描，
+  // 避免出现 Q1 的 visibleRule 引用 Q2 时，Q2 尚未注入到 ctx 的情况。
+  // 判定顺序：
+  //   a) attribute.display === 'hidden' → 后台原生隐藏，直接 false（与 validateAll/submit 过滤保持一致）
+  //   b) attribute.visibleRule 存在 → 调用 evaluateVisibleRule 计算
+  //   c) 其他情况默认可见
+  let visIndex = 0;
+  questions.forEach(q => {
+    visIndex++;
+    // console.log(q)
+    const qKey = `Q${visIndex}`;
+    const attr = (q && q.attribute) || {};
+    let visible = true;
+    if (attr.visibleRule) {
+      try {
+        visible = evaluateVisibleRule(attr.visibleRule, ctx);
+        // console.log(visible)
+      } catch (e) {
+        console.warn(`[Formula] visibleRule 计算失败: ${attr.visibleRule}`, e);
+        visible = true;
+      }
+    } else if (attr.display === 'hidden') {
+      visible = false;
+    }
+    visible = Boolean(visible);
+    ctx[`VISIBLE_${qKey}`] = visible;
+    if (q && q.id) ctx[`VISIBLE_${q.id}`] = visible;
+
+    // 隐藏的分值题（FillBlank/Textarea）：填写内容按空字符串处理，
+    // 同步刷新其派生变量，避免被隐藏的评分仍参与 SUM/SCORE/COUNT 等计算。
+    if (!visible && (q.type === 'FillBlank' || q.type === 'Textarea')) {
+      ctx[qKey] = '';
+      if (q && q.id) ctx[q.id] = '';
+      ctx[`TEXT_${qKey}`] = '';
+      ctx[`SCORE_${qKey}`] = 0;
+      ctx[`COUNT_${qKey}`] = 0;
+    }
+  });
+
   return ctx;
 }
 
@@ -498,6 +546,7 @@ function normalizeFormulas(formulaStr) {
   str = str.replace(/\bTEXT\s*\(\s*(Q\d+)\s*\)/gi, 'TEXT_$1');
   str = str.replace(/\bSCORE\s*\(\s*(Q\d+)\s*\)/gi, 'SCORE_$1');
   str = str.replace(/\bCOUNT\s*\(\s*(Q\d+)\s*\)/gi, 'COUNT_$1');
+  str = str.replace(/\bVISIBLE\s*\(\s*(Q\d+)\s*\)/gi, 'VISIBLE_$1');
   return str;
 }
 
